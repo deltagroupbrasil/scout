@@ -1,0 +1,130 @@
+// LeapScout - Sistema de Inteligência de Leads B2B
+// Prisma Schema - MVP Version 1.0
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// ============================================
+// USER MODEL
+// ============================================
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  notes     Note[]
+
+  @@map("users")
+}
+
+// ============================================
+// COMPANY MODEL
+// ============================================
+model Company {
+  id          String    @id @default(uuid())
+  name        String
+  cnpj        String?   @unique
+  revenue     Float?    // Faturamento anual em reais
+  employees   Int?      // Número de funcionários
+  sector      String?   // Setor de atuação
+  location    String?   // Endereço completo
+  website     String?
+  linkedinUrl String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  leads       Lead[]
+
+  @@map("companies")
+}
+
+// ============================================
+// LEAD MODEL
+// ============================================
+model Lead {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Informações da Vaga
+  jobTitle        String
+  jobDescription  String
+  jobUrl          String
+  jobPostedDate   DateTime
+  jobSource       String   @default("LinkedIn")
+  candidateCount  Int?     // Número de candidatos (quando disponível)
+
+  // Inteligência (IA Generated)
+  suggestedContacts String?  // JSON serializado: Array de {name, role, linkedin, email, phone}
+  triggers          String?  // JSON serializado: Array de strings com gatilhos de abordagem
+
+  // CRM Status
+  status          LeadStatus @default(NEW)
+
+  // Metadata
+  isNew           Boolean    @default(true)  // Flag para leads < 48h
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  notes           Note[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([companyId])
+  @@map("leads")
+}
+
+// ============================================
+// NOTE MODEL
+// ============================================
+model Note {
+  id        String   @id @default(uuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([leadId])
+  @@index([createdAt])
+  @@map("notes")
+}
+
+// ============================================
+// SCRAPE LOG MODEL
+// ============================================
+model ScrapeLog {
+  id            String   @id @default(uuid())
+  status        String   // success, error, running
+  query         String   // Query usada na busca
+  jobsFound     Int      @default(0)
+  leadsCreated  Int      @default(0)
+  errors        String?  // Erros encontrados (JSON)
+  duration      Int?     // Duração em segundos
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("scrape_logs")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+enum LeadStatus {
+  NEW         // Novo - Lead recém captado
+  CONTACTED   // Contatado - Primeiro contato realizado
+  QUALIFIED   // Qualificado - Lead com potencial confirmado
+  DISCARDED   // Descartado - Lead sem fit
+
+  @@map("lead_status")
+}
