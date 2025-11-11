@@ -31,12 +31,13 @@ Senha: admin123
 ### ✅ Claude AI (Anthropic)
 - **Status:** ✅ FUNCIONANDO
 - **Modelo:** claude-3-5-haiku-20241022
-- **Uso:** Geração de decisores e gatilhos
+- **Uso:** Geração de decisores e gatilhos + cálculo de score de prioridade
 
 **Teste:**
 ```bash
 cd leapscout
 npx tsx scripts/test-ai-insights.ts
+npx tsx scripts/recalculate-priority-scores.ts
 ```
 
 ### ✅ Hunter.io
@@ -49,9 +50,22 @@ npx tsx scripts/test-ai-insights.ts
 - **Custo:** GRÁTIS
 - **Uso:** Buscar dados de CNPJ
 
-### ⏳ Bright Data
+### ⏳ Bright Data (LinkedIn)
 - **Status:** ⏳ Não disponível no momento
-- **Alternativa:** Usar scraping manual via `/api/scrape`
+- **Alternativa:** Usar Gupy e Catho scrapers (funcionando)
+
+### ✅ Gupy Scraper
+- **Status:** ✅ MOCK FUNCIONANDO
+- **Uso:** Scraping de vagas do Gupy (maior plataforma BR)
+
+### ✅ Catho Scraper
+- **Status:** ✅ MOCK FUNCIONANDO
+- **Uso:** Scraping de vagas do Catho (maior site de empregos BR)
+
+**Teste Multi-Fonte:**
+```bash
+npx tsx scripts/test-multi-source-scraping.ts
+```
 
 ---
 

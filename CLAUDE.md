@@ -167,6 +167,43 @@ NEW → CONTACTED → QUALIFIED
 
 The `isNew` flag is set to `false` when status changes, preventing the "NEW" badge from persisting after first interaction.
 
+### Priority Score System
+
+Leads have a `priorityScore` field (0-100) calculated automatically based on 5 factors:
+
+1. **Revenue** (0-35 points): Higher revenue = higher priority
+2. **Employees** (0-25 points): Larger companies = higher priority
+3. **Recency** (0-20 points): Newer job posts = higher priority
+4. **Candidate Count** (0-10 points): Fewer candidates = more urgent
+5. **AI Triggers** (0-10 points): More triggers = better qualified
+
+Score calculation happens automatically in `lead-orchestrator.ts` when creating leads. To recalculate for existing leads:
+```bash
+npx tsx scripts/recalculate-priority-scores.ts
+```
+
+The dashboard displays priority badges (Muito Alta, Alta, Média, Baixa, Muito Baixa) with color coding.
+
+### Multi-Source Scraping
+
+The system now supports scraping from multiple job platforms:
+- **LinkedIn**: Via Bright Data (requires API key)
+- **Gupy**: Brazilian recruitment platform (mock implementation)
+- **Catho**: Largest Brazilian job board (mock implementation)
+
+All sources are scraped in parallel in `lead-orchestrator.ts`. To add a new source:
+1. Create `lib/services/[source]-scraper.ts`
+2. Implement `scrapeJobs(query)` method returning `LinkedInJobData[]`
+3. Add to `scrapeAndProcessLeads()` in lead-orchestrator
+
+### CSV Export
+
+Leads can be exported to CSV via `/api/leads/export`:
+- Respects same filters as dashboard (status, date range, search)
+- Includes all lead and company data
+- Formats revenue as "R$ X.XM"
+- Escapes special characters properly
+
 ## Common Pitfalls
 
 1. **Prisma Client out of sync**: After schema changes, run `npx prisma generate`. If dev server is running, restart it.
