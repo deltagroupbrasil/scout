@@ -53,6 +53,16 @@ export default function DashboardPage() {
     }
   }
 
+  async function exportToCSV() {
+    const params = new URLSearchParams()
+    if (filters.status && filters.status !== 'ALL') params.set('status', filters.status)
+    if (filters.search) params.set('search', filters.search)
+    if (filters.dateRange) params.set('dateRange', filters.dateRange)
+
+    const url = `/api/leads/export?${params}`
+    window.open(url, '_blank')
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -107,10 +117,23 @@ export default function DashboardPage() {
       {/* Filters */}
       <Card>
         <CardHeader>
-          <CardTitle>Leads</CardTitle>
-          <CardDescription>
-            Filtre e gerencie suas oportunidades de negócio
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Leads</CardTitle>
+              <CardDescription>
+                Filtre e gerencie suas oportunidades de negócio
+              </CardDescription>
+            </div>
+            <button
+              onClick={exportToCSV}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              <svg className="mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Exportar CSV
+            </button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <LeadFiltersComponent filters={filters} onFilterChange={setFilters} />

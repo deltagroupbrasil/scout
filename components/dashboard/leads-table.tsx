@@ -36,6 +36,22 @@ function formatRevenue(revenue: number | null | undefined): string {
   }).format(revenue)
 }
 
+function getPriorityBadge(score: number) {
+  if (score >= 80) {
+    return { label: 'Muito Alta', className: 'bg-red-100 text-red-800' }
+  }
+  if (score >= 60) {
+    return { label: 'Alta', className: 'bg-orange-100 text-orange-800' }
+  }
+  if (score >= 40) {
+    return { label: 'Média', className: 'bg-yellow-100 text-yellow-800' }
+  }
+  if (score >= 20) {
+    return { label: 'Baixa', className: 'bg-green-100 text-green-800' }
+  }
+  return { label: 'Muito Baixa', className: 'bg-blue-100 text-blue-800' }
+}
+
 export default function LeadsTable({ leads }: LeadsTableProps) {
   if (leads.length === 0) {
     return (
@@ -54,6 +70,7 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
             <TableHead>Empresa</TableHead>
             <TableHead>Faturamento</TableHead>
             <TableHead>Cargo</TableHead>
+            <TableHead>Prioridade</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Data</TableHead>
           </TableRow>
@@ -61,6 +78,7 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
         <TableBody>
           {leads.map((lead) => {
             const config = STATUS_CONFIG[lead.status]
+            const priorityBadge = getPriorityBadge(lead.priorityScore || 0)
             const daysAgo = formatDistance(new Date(lead.createdAt), new Date(), {
               addSuffix: true,
               locale: ptBR
@@ -93,6 +111,16 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
                 <TableCell>
                   <Link href={`/dashboard/leads/${lead.id}`} className="block">
                     {lead.jobTitle}
+                  </Link>
+                </TableCell>
+                <TableCell>
+                  <Link href={`/dashboard/leads/${lead.id}`} className="block">
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${priorityBadge.className}`}>
+                        {priorityBadge.label}
+                      </span>
+                      <span className="text-xs text-gray-500">{lead.priorityScore}/100</span>
+                    </div>
                   </Link>
                 </TableCell>
                 <TableCell>

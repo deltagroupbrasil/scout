@@ -1,9 +1,12 @@
 // Lead Orchestrator - Orquestra todo o processo de criação de leads
 import { prisma } from "@/lib/prisma"
 import { linkedInScraper } from "./linkedin-scraper"
+import { gupyScraper } from "./gupy-scraper"
+import { cathoScraper } from "./catho-scraper"
 import { companyEnrichment } from "./company-enrichment"
 import { aiInsights } from "./ai-insights"
 import { emailFinder } from "./email-finder"
+import { priorityScore } from "./priority-score"
 import { LinkedInJobData } from "@/types"
 
 export class LeadOrchestratorService {
@@ -77,10 +80,21 @@ export class LeadOrchestratorService {
           triggers: JSON.stringify(insights.triggers),
           status: 'NEW',
           isNew: true,
+          priorityScore: 0, // Será calculado abaixo
+        },
+        include: {
+          company: true,
         },
       })
 
-      console.log(`✅ Lead criado: ${lead.id}`)
+      // 6. Calcular e atualizar score de prioridade
+      const score = priorityScore.calculateScore(lead as any)
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: { priorityScore: score },
+      })
+
+      console.log(`✅ Lead criado: ${lead.id} (Score: ${score}/100)`)
       return lead.id
     } catch (error) {
       console.error('Erro ao processar vaga:', error)
@@ -151,18 +165,42 @@ export class LeadOrchestratorService {
   }
 
   /**
-   * Executa scraping completo e processa todos os leads
+   * Executa scraping completo e processa todos os leads de múltiplas fontes
    */
   async scrapeAndProcessLeads(query: string): Promise<number> {
-    console.log('🔍 Iniciando scraping de vagas...')
+    console.log('🔍 Iniciando scraping de vagas de múltiplas fontes...')
 
-    const jobs = await linkedInScraper.searchJobs(query)
+    // Scraping de todas as fontes em paralelo
+    const [linkedInJobs, gupyJobs, cathoJobs] = await Promise.all([
+      linkedInScraper.searchJobs(query).catch(err => {
+        console.error('[LinkedIn] Erro:', err)
+        return []
+      }),
+      gupyScraper.scrapeJobs(query).catch(err => {
+        console.error('[Gupy] Erro:', err)
+        return []
+      }),
+      cathoScraper.scrapeJobs(query).catch(err => {
+        console.error('[Catho] Erro:', err)
+        return []
+      }),
+    ])
 
-    console.log(`📊 ${jobs.length} vagas encontradas`)
+    // Combinar todos os jobs
+    const allJobs = [
+      ...linkedInJobs.map(j => ({ ...j, source: 'LinkedIn' })),
+      ...gupyJobs.map(j => ({ ...j, source: 'Gupy' })),
+      ...cathoJobs.map(j => ({ ...j, source: 'Catho' })),
+    ]
+
+    console.log(`📊 Total de vagas encontradas: ${allJobs.length}`)
+    console.log(`   - LinkedIn: ${linkedInJobs.length}`)
+    console.log(`   - Gupy: ${gupyJobs.length}`)
+    console.log(`   - Catho: ${cathoJobs.length}`)
 
     let successCount = 0
 
-    for (const job of jobs) {
+    for (const job of allJobs) {
       const leadId = await this.processJobListing(job)
       if (leadId) {
         successCount++
