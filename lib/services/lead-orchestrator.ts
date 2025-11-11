@@ -109,13 +109,10 @@ export class LeadOrchestratorService {
     companyName: string,
     companyUrl?: string
   ): Promise<any> {
-    // Buscar empresa existente
+    // Buscar empresa existente (SQLite não suporta mode: insensitive)
     let company = await prisma.company.findFirst({
       where: {
-        name: {
-          equals: companyName,
-          mode: 'insensitive',
-        },
+        name: companyName,
       },
     })
 
