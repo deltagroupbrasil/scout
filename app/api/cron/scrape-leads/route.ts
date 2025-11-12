@@ -49,8 +49,8 @@ export async function GET(request: NextRequest) {
 
     console.log('🚀 Iniciando cron job de scraping...')
 
-    // Query para buscar vagas
-    const query = 'Controller OR CFO OR "Gerente Controladoria" OR "Coordenador BPO" São Paulo'
+    // Query para buscar vagas - termos específicos de Controladoria e BPO Financeiro
+    const query = '(Controller OR "Gerente Financeiro" OR "Coordenador Financeiro" OR "Analista Controladoria" OR "Coordenador Controladoria" OR "Gerente Controladoria" OR "CFO" OR "Diretor Financeiro" OR "Coordenador BPO Financeiro" OR "Analista Contábil") AND (Controladoria OR Financeiro OR Contábil OR BPO) São Paulo'
 
     // Executar scraping
     const leadsCreated = await leadOrchestrator.scrapeAndProcessLeads(query)

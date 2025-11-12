@@ -36,9 +36,13 @@ npx tsx scripts/test-serp-api.ts              # Test SERP API (Google search)
 npx tsx scripts/test-web-unlocker.ts          # Test Web Unlocker (Gupy, Catho, InfoJobs)
 npx tsx scripts/test-multi-source-scraping.ts # Test all scrapers together
 
-# Database
+# Database & Enrichment
 npx tsx scripts/recalculate-priority-scores.ts # Recalculate priority scores for all leads
 npx tsx scripts/populate-db.ts                 # Populate database with test data
+npx tsx scripts/clear-leads.ts                 # Clear all leads and companies from database
+npx tsx scripts/check-companies.ts             # Check companies data (CNPJ, revenue, employees)
+npx tsx scripts/enrich-companies.ts            # Enrich companies with CNPJ using Receita Federal API
+npx tsx scripts/test-cnpj-finder.ts            # Test CNPJ finder service
 ```
 
 ### API Testing
@@ -166,6 +170,49 @@ The Claude API integration (`lib/services/ai-insights.ts`) uses a carefully craf
 **Fallback**: If API fails, returns generic insights based on job title pattern matching.
 
 The AI response is parsed as JSON. If parsing fails, falls back to defaults. Always test with `scripts/test-ai-insights.ts` after modifying the prompt.
+
+### CNPJ Finder & Company Enrichment
+
+The system automatically enriches company data using CNPJ (Brazilian tax ID) lookups via Receita Federal API.
+
+**Implementation**: `lib/services/cnpj-finder.ts` + `lib/services/company-enrichment.ts`
+
+**How it works**:
+1. **CNPJ Lookup**: When a new company is found, the system searches for its CNPJ:
+   - First checks local database of 30+ known companies (Magazine Luiza, Petrobras, Vale, etc.)
+   - Falls back to null if not found (APIs públicas têm rate limiting)
+
+2. **Data Enrichment**: With CNPJ, fetches from Brasil API (Receita Federal):
+   - Capital social → Estimated revenue (capital_social × 5)
+   - Porte (ME/EPP/DEMAIS) → Estimated employees (10/50/500)
+   - CNAE fiscal → Company sector
+   - Email domain → Company website
+
+**Rate Limiting**:
+- Brasil API: Free, but has rate limits (403/429 errors)
+- System includes 3-second delays between requests
+- Graceful fallback: saves CNPJ but skips revenue/employees if rate limited
+
+**Scripts**:
+```bash
+# Test CNPJ finder with known companies
+npx tsx scripts/test-cnpj-finder.ts
+
+# Check which companies have data
+npx tsx scripts/check-companies.ts
+
+# Enrich existing companies that have CNPJ but no revenue
+npx tsx scripts/enrich-companies.ts
+```
+
+**Adding new known CNPJs**:
+Edit `lib/services/cnpj-finder.ts` and add to `KNOWN_CNPJS` object:
+```typescript
+const KNOWN_CNPJS: Record<string, string> = {
+  'company name': '12345678000190',  // 14 digits, no formatting
+  // ...
+}
+```
 
 ### Bright Data Integration
 

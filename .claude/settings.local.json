@@ -9,7 +9,14 @@
       "Bash(Select-String \"BRIGHT_DATA_PUPPETEER\")",
       "Bash(test:*)",
       "Bash(claude mcp add:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Integração completa Bright Data - Puppeteer, SERP API e Web Unlocker\n\nImplementa 3 APIs da Bright Data para scraping profissional de vagas:\n\n🎯 Features implementadas:\n1. LinkedIn Scraper com Puppeteer (browser automation real)\n   - Conexão WebSocket para navegador Chrome remoto\n   - Bypass automático de anti-bot\n   - Rotação de IPs\n   - Renderização completa de JavaScript\n\n2. SERP API (busca Google multi-fonte)\n   - Busca vagas via Google Search\n   - Suporte para múltiplas plataformas simultaneamente\n   - Mais econômico que scraping direto\n\n3. Web Unlocker (sites brasileiros)\n   - Scraping de Gupy, Catho, InfoJobs\n   - CAPTCHA solving automático\n   - Parsing HTML com Cheerio\n\n📦 Dependências adicionadas:\n- puppeteer-core (browser automation)\n- cheerio (HTML parsing)\n- dotenv (environment variables)\n\n🧪 Scripts de teste criados:\n- test-linkedin-scraper.ts (✅ testado - conecta com sucesso)\n- test-serp-api.ts (✅ testado - API responde)\n- test-web-unlocker.ts (aguardando ajuste de seletores)\n\n📝 Documentação atualizada:\n- CLAUDE.md: Seção detalhada sobre Bright Data APIs\n- BRIGHT_DATA_INTEGRATION.md: Guia completo de uso\n- .env.example: Novas variáveis de ambiente\n\n🔧 Configuração MCP:\n- MCP server configurado em .claude/mcp.json\n- SSE endpoint configurado para acesso via Claude\n\n🚀 Status:\n- LinkedIn Puppeteer: ✅ Funcional (limitado por rate)\n- SERP API: ✅ Funcional (retorna HTML)\n- Web Unlocker: ⚠️ Implementado (requer teste real)\n\n🤖 Generated with Claude Code (https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(taskkill:*)",
+      "Bash(npx kill-port:*)",
+      "Bash(curl:*)",
+      "Bash(timeout 10 bash:*)",
+      "Bash(timeout 15 bash:*)",
+      "Bash(npx prisma db execute:*)"
     ],
     "deny": [],
     "ask": []

@@ -64,28 +64,175 @@ export class LinkedInScraperService {
       await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 60000 })
 
       // Aguardar lista de vagas carregar
-      await page.waitForSelector('.jobs-search__results-list', { timeout: 30000 })
+      // Tentar aguardar por diferentes containers de resultados
+      try {
+        await Promise.race([
+          page.waitForSelector('.jobs-search__results-list', { timeout: 30000 }),
+          page.waitForSelector('.scaffold-layout__list', { timeout: 30000 }),
+          page.waitForSelector('[data-job-id]', { timeout: 30000 })
+        ])
+      } catch (error) {
+        console.warn('⚠️ Timeout aguardando lista de vagas, tentando extrair mesmo assim...')
+      }
 
       console.log('📊 Extraindo vagas da página...')
 
       // Extrair dados das vagas
       const jobs = await page.evaluate(() => {
-        const jobCards = document.querySelectorAll('.base-card')
+        // Tentar múltiplos seletores (LinkedIn muda frequentemente)
+        const possibleSelectors = [
+          '.base-card',
+          '.job-card-container',
+          '.jobs-search-results__list-item',
+          '[data-job-id]',
+          '.scaffold-layout__list-item'
+        ]
+
+        let jobCards: NodeListOf<Element> | null = null
+        for (const selector of possibleSelectors) {
+          jobCards = document.querySelectorAll(selector)
+          if (jobCards.length > 0) {
+            console.log(`✅ Usando seletor: ${selector} (${jobCards.length} cards encontrados)`)
+            break
+          }
+        }
+
+        if (!jobCards || jobCards.length === 0) {
+          console.warn('⚠️ Nenhum card de vaga encontrado com seletores tradicionais')
+          console.log('🔄 Tentando fallback: buscar todos os links de vagas...')
+
+          // Fallback: buscar todos os links que apontam para /jobs/view/
+          const jobLinks = document.querySelectorAll('a[href*="/jobs/view/"]')
+          console.log(`🔗 Encontrados ${jobLinks.length} links de vagas`)
+
+          if (jobLinks.length === 0) {
+            console.error('❌ Nenhuma vaga encontrada mesmo com fallback')
+            return []
+          }
+
+          // Extrair dados dos links
+          const fallbackResults: any[] = []
+          jobLinks.forEach((link, index) => {
+            try {
+              const url = (link as HTMLAnchorElement).href
+              const title = link.textContent?.trim() || link.getAttribute('aria-label') || ''
+
+              // Tentar encontrar empresa no elemento pai
+              const parent = link.closest('li, div[class*="job"]')
+              let company = ''
+
+              if (parent) {
+                const companyElements = parent.querySelectorAll('h4, span[class*="company"], [class*="subtitle"]')
+                for (const el of companyElements) {
+                  const text = el.textContent?.trim() || ''
+                  if (text && text !== title) {
+                    company = text
+                    break
+                  }
+                }
+              }
+
+              if (title && url) {
+                fallbackResults.push({
+                  jobTitle: title,
+                  companyName: company || 'Empresa não identificada',
+                  location: '',
+                  jobUrl: url,
+                  postedDate: new Date().toISOString().split('T')[0],
+                })
+
+                if (index < 3) {
+                  console.log(`Fallback Card ${index + 1}:`, {
+                    title: title.substring(0, 50),
+                    company: company.substring(0, 30),
+                    url: url.substring(0, 50)
+                  })
+                }
+              }
+            } catch (err) {
+              console.error('Erro no fallback:', err)
+            }
+          })
+
+          return fallbackResults
+        }
+
         const results: any[] = []
 
-        jobCards.forEach((card) => {
+        jobCards.forEach((card, index) => {
           try {
-            const titleElement = card.querySelector('.base-search-card__title')
-            const companyElement = card.querySelector('.base-search-card__subtitle')
-            const locationElement = card.querySelector('.job-search-card__location')
-            const linkElement = card.querySelector('a.base-card__full-link')
+            // Múltiplos seletores para cada campo
+            const titleSelectors = [
+              '.base-search-card__title',
+              '.job-card-list__title',
+              'h3.base-search-card__title',
+              'a[data-tracking-control-name*="job"]',
+              '.job-card-container__link'
+            ]
+
+            const companySelectors = [
+              '.base-search-card__subtitle',
+              '.job-card-container__company-name',
+              'h4.base-search-card__subtitle',
+              '.job-card-container__primary-description'
+            ]
+
+            const locationSelectors = [
+              '.job-search-card__location',
+              '.job-card-container__metadata-item',
+              '.artdeco-entity-lockup__caption'
+            ]
+
+            const linkSelectors = [
+              'a.base-card__full-link',
+              'a.job-card-list__title',
+              'a[href*="/jobs/view/"]'
+            ]
+
+            // Encontrar elementos
+            let titleElement: Element | null = null
+            let companyElement: Element | null = null
+            let locationElement: Element | null = null
+            let linkElement: Element | null = null
+
+            for (const sel of titleSelectors) {
+              titleElement = card.querySelector(sel)
+              if (titleElement) break
+            }
+
+            for (const sel of companySelectors) {
+              companyElement = card.querySelector(sel)
+              if (companyElement) break
+            }
+
+            for (const sel of locationSelectors) {
+              locationElement = card.querySelector(sel)
+              if (locationElement) break
+            }
+
+            for (const sel of linkSelectors) {
+              linkElement = card.querySelector(sel)
+              if (linkElement) break
+            }
+
             const dateElement = card.querySelector('time')
 
             const title = titleElement?.textContent?.trim() || ''
             const company = companyElement?.textContent?.trim() || ''
             const location = locationElement?.textContent?.trim() || ''
             const url = linkElement?.getAttribute('href') || ''
-            const postedDate = dateElement?.getAttribute('datetime') || ''
+            const postedDate = dateElement?.getAttribute('datetime') || new Date().toISOString().split('T')[0]
+
+            // Debug: logar o que foi encontrado
+            if (index < 3) {
+              console.log(`Card ${index + 1}:`, {
+                title: title.substring(0, 50),
+                company: company.substring(0, 30),
+                url: url.substring(0, 50),
+                foundTitle: !!titleElement,
+                foundCompany: !!companyElement
+              })
+            }
 
             if (title && company && url) {
               results.push({
@@ -95,6 +242,8 @@ export class LinkedInScraperService {
                 jobUrl: url,
                 postedDate,
               })
+            } else {
+              console.warn(`Card ${index + 1} incompleto: title=${!!title}, company=${!!company}, url=${!!url}`)
             }
           } catch (err) {
             console.error('Erro ao processar card de vaga:', err)

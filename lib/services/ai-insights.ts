@@ -72,17 +72,23 @@ export class AIInsightsService {
     jobDescription: string
   ): string {
     return `
-Você é um especialista em prospecção B2B no Brasil. Analise as informações abaixo e forneça:
+Você é um especialista em prospecção B2B para serviços de Controladoria e BPO Financeiro no Brasil.
 
-1. **Decisores sugeridos** (2 pessoas):
+**CONTEXTO IMPORTANTE**: A empresa ${companyName} está contratando para a vaga "${jobTitle}".
+Isso indica uma oportunidade para vender serviços de Controladoria/BPO para a EMPRESA (não para o candidato).
+
+Analise e forneça:
+
+1. **Decisores-chave na empresa** (2 pessoas) - Quem pode COMPRAR serviços de Controladoria/BPO:
    - Nome fictício brasileiro realista (ex: "Carlos Mendes", "Ana Paula Silva")
-   - Cargo/função dentro da empresa
+   - Cargo de decisão (CFO, Diretor Financeiro, CEO, COO, VP Finanças)
    - LinkedIn: deixe vazio
+   - **NÃO sugira cargos relacionados à vaga (ex: se a vaga é Controller, NÃO sugira Controller)**
 
-2. **Gatilhos de abordagem** (3-4 insights):
-   - Contexto relevante sobre a empresa
-   - Oportunidades de negócio relacionadas à vaga
-   - Sinais de crescimento ou mudança
+2. **Gatilhos de abordagem** (3-4 insights) - Por que a empresa pode precisar de serviços terceirizados:
+   - Sinais de expansão que podem sobrecarregar o time atual
+   - Oportunidades de terceirizar processos repetitivos
+   - Momentos de transformação que demandam expertise externa
    - Pontos de dor que serviços de Controladoria/BPO podem resolver
 
 **Informações da empresa:**

@@ -10,14 +10,29 @@ export class CompanyEnrichmentService {
       // Remover caracteres não numéricos do CNPJ
       const cleanCNPJ = cnpj.replace(/\D/g, '')
 
+      console.log(`[Enrichment] Buscando dados para CNPJ: ${cleanCNPJ}`)
+
       // API pública da Receita Federal (via BrasilAPI)
       const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCNPJ}`)
 
       if (!response.ok) {
+        if (response.status === 403 || response.status === 429) {
+          console.warn(`⚠️  [Enrichment] Rate limit atingido (${response.status}), usando apenas CNPJ`)
+          // Retornar apenas o CNPJ sem enriquecimento
+          return {
+            cnpj: cleanCNPJ,
+            revenue: undefined,
+            employees: undefined,
+            sector: undefined,
+            website: undefined,
+          }
+        }
         throw new Error(`Erro ao buscar CNPJ: ${response.status}`)
       }
 
       const data = await response.json()
+
+      console.log(`✅ [Enrichment] Dados enriquecidos: ${data.nome_fantasia || data.razao_social}`)
 
       return {
         cnpj: data.cnpj,
@@ -27,7 +42,7 @@ export class CompanyEnrichmentService {
         website: data.email ? `https://${data.email.split('@')[1]}` : undefined,
       }
     } catch (error) {
-      console.error('Erro ao buscar dados da Receita Federal:', error)
+      console.error('❌ [Enrichment] Erro ao buscar dados da Receita Federal:', error)
       return null
     }
   }
@@ -87,18 +102,23 @@ export class CompanyEnrichmentService {
 
   /**
    * Estima o número de funcionários baseado no porte
+   * Fonte: Receita Federal / BrasilAPI
    */
   private estimateEmployees(porte?: string): number | undefined {
     if (!porte) return undefined
 
+    // Mapeamento dos portes da Receita Federal
     const porteMap: Record<string, number> = {
-      'ME': 10,       // Microempresa
-      'EPP': 50,      // Empresa de Pequeno Porte
-      'MEDIA': 200,   // Média
-      'GRANDE': 1000  // Grande
+      'MICRO EMPRESA': 10,           // Código 1: até 9 funcionários
+      'ME': 10,
+      'EMPRESA DE PEQUENO PORTE': 50, // Código 3: 10-49 funcionários
+      'EPP': 50,
+      'DEMAIS': 500,                 // Código 5: 50+ funcionários (empresas grandes)
+      'MEDIA': 200,
+      'GRANDE': 1000
     }
 
-    return porteMap[porte.toUpperCase()] || undefined
+    return porteMap[porte.toUpperCase()] || 100  // Default: 100 funcionários
   }
 }
 

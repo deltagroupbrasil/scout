@@ -46,9 +46,9 @@ export class CathoScraperService {
 
     if (isRelevant) {
       mockJobs.push({
-        title: "Controller",
-        company: "Grupo Pão de Açúcar",
-        companyUrl: "https://www.paodeacucar.com",
+        jobTitle: "Controller",
+        companyName: "Grupo Pão de Açúcar",
+        jobUrl: "https://www.catho.com.br/vagas/controller-grupo-pao-de-acucar-123456",
         description: `
 Grupo Pão de Açúcar busca Controller para atuar em São Paulo.
 
@@ -67,15 +67,14 @@ Requisitos:
 - Inglês fluente
 - CRC ativo
         `.trim(),
-        jobUrl: "https://www.catho.com.br/vagas/controller-grupo-pao-de-acucar-123456",
         postedDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 dias atrás
-        candidateCount: 142,
+        applicants: 142,
       })
 
       mockJobs.push({
-        title: "Analista Contábil Sênior",
-        company: "Bradesco",
-        companyUrl: "https://www.bradesco.com.br",
+        jobTitle: "Analista Contábil Sênior",
+        companyName: "Bradesco",
+        jobUrl: "https://www.catho.com.br/vagas/analista-contabil-senior-bradesco-789012",
         description: `
 Bradesco contrata Analista Contábil Sênior para atuar em Osasco/SP.
 
@@ -94,15 +93,14 @@ Requisitos:
 - Conhecimento em IFRS
 - Excel avançado e SQL (diferencial)
         `.trim(),
-        jobUrl: "https://www.catho.com.br/vagas/analista-contabil-senior-bradesco-789012",
         postedDate: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000), // 4 dias atrás
-        candidateCount: 231,
+        applicants: 231,
       })
 
       mockJobs.push({
-        title: "Supervisor de BPO Financeiro",
-        company: "Serasa Experian",
-        companyUrl: "https://www.serasaexperian.com.br",
+        jobTitle: "Supervisor de BPO Financeiro",
+        companyName: "Serasa Experian",
+        jobUrl: "https://www.catho.com.br/vagas/supervisor-bpo-financeiro-serasa-345678",
         description: `
 Serasa Experian busca Supervisor de BPO Financeiro.
 
@@ -120,15 +118,14 @@ O que buscamos:
 - Liderança de equipes multidisciplinares
 - Inglês intermediário
         `.trim(),
-        jobUrl: "https://www.catho.com.br/vagas/supervisor-bpo-financeiro-serasa-345678",
         postedDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 dia atrás
-        candidateCount: 98,
+        applicants: 98,
       })
 
       mockJobs.push({
-        title: "Gerente de Controladoria",
-        company: "Votorantim Cimentos",
-        companyUrl: "https://www.votorantimcimentos.com.br",
+        jobTitle: "Gerente de Controladoria",
+        companyName: "Votorantim Cimentos",
+        jobUrl: "https://www.catho.com.br/vagas/gerente-controladoria-votorantim-901234",
         description: `
 Votorantim Cimentos contrata Gerente de Controladoria.
 
@@ -147,9 +144,8 @@ Perfil desejado:
 - Inglês fluente / Espanhol desejável
 - Vivência com ERP SAP
         `.trim(),
-        jobUrl: "https://www.catho.com.br/vagas/gerente-controladoria-votorantim-901234",
         postedDate: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000), // 6 dias atrás
-        candidateCount: 187,
+        applicants: 187,
       })
     }
 
@@ -191,13 +187,13 @@ Perfil desejado:
    */
   private transformCathoJobs(cathoData: any[]): LinkedInJobData[] {
     return cathoData.map(job => ({
-      title: job.title,
-      company: job.company,
-      companyUrl: job.companyUrl || undefined,
-      description: job.description || '',
+      jobTitle: job.title,
+      companyName: job.company,
       jobUrl: job.url || `https://www.catho.com.br/vagas/${job.id}`,
+      description: job.description || '',
       postedDate: job.publishedDate ? new Date(job.publishedDate) : new Date(),
-      candidateCount: job.candidateCount || undefined,
+      applicants: job.candidateCount || 0,
+      cnpj: null,
     }))
   }
 }

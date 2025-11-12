@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { LeadFilters, LeadWithCompany, PaginatedResponse } from "@/types"
 import LeadFiltersComponent from "@/components/dashboard/lead-filters"
 import LeadsTable from "@/components/dashboard/leads-table"
+import ScrapeButton from "@/components/dashboard/scrape-button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function DashboardPage() {
@@ -124,15 +125,18 @@ export default function DashboardPage() {
                 Filtre e gerencie suas oportunidades de negócio
               </CardDescription>
             </div>
-            <button
-              onClick={exportToCSV}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              <svg className="mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              Exportar CSV
-            </button>
+            <div className="flex gap-2">
+              <ScrapeButton onComplete={fetchLeads} />
+              <button
+                onClick={exportToCSV}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                <svg className="mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Exportar CSV
+              </button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">

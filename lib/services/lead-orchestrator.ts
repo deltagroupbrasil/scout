@@ -8,6 +8,7 @@ import { aiInsights } from "./ai-insights"
 import { emailFinder } from "./email-finder"
 import { priorityScore } from "./priority-score"
 import { LinkedInJobData } from "@/types"
+import { cnpjFinder } from "./cnpj-finder"
 
 export class LeadOrchestratorService {
   /**
@@ -15,12 +16,12 @@ export class LeadOrchestratorService {
    */
   async processJobListing(jobData: LinkedInJobData): Promise<string | null> {
     try {
-      console.log(`Processando vaga: ${jobData.title} - ${jobData.company}`)
+      console.log(`Processando vaga: ${jobData.jobTitle} - ${jobData.companyName}`)
 
       // 1. Buscar ou criar empresa
       const company = await this.getOrCreateCompany(
-        jobData.company,
-        jobData.companyUrl
+        jobData.companyName,
+        jobData.jobUrl
       )
 
       if (!company) {
@@ -45,7 +46,7 @@ export class LeadOrchestratorService {
       const insights = await aiInsights.generateInsights(
         company.name,
         company.sector || '',
-        jobData.title,
+        jobData.jobTitle,
         jobData.description
       )
 
@@ -70,12 +71,12 @@ export class LeadOrchestratorService {
       const lead = await prisma.lead.create({
         data: {
           companyId: company.id,
-          jobTitle: jobData.title,
+          jobTitle: jobData.jobTitle,
           jobDescription: jobData.description,
           jobUrl: jobData.jobUrl,
-          jobPostedDate: jobData.postedDate,
+          jobPostedDate: new Date(jobData.postedDate),
           jobSource: 'LinkedIn',
-          candidateCount: jobData.candidateCount,
+          candidateCount: jobData.applicants,
           suggestedContacts: JSON.stringify(insights.suggestedContacts),
           triggers: JSON.stringify(insights.triggers),
           status: 'NEW',
@@ -127,6 +128,10 @@ export class LeadOrchestratorService {
 
     if (cnpj) {
       enrichmentData = await companyEnrichment.getCompanyByCNPJ(cnpj)
+
+      // Delay de 3 segundos após enriquecimento para evitar rate limit
+      // Brasil API tem limite de requisições por minuto
+      await this.sleep(3000)
     }
 
     // 2. Criar empresa
@@ -152,13 +157,17 @@ export class LeadOrchestratorService {
     companyName: string,
     companyUrl?: string
   ): Promise<string | null> {
-    // TODO: Implementar busca de CNPJ
-    // Opções:
-    // 1. Extrair do LinkedIn (às vezes aparece)
-    // 2. Buscar na Receita Federal
-    // 3. Scraping do site da empresa
+    // 1. Tentar extrair da URL (LinkedIn às vezes tem CNPJ na URL)
+    const cnpjFromUrl = cnpjFinder.extractCNPJFromURL(companyUrl)
+    if (cnpjFromUrl) {
+      console.log(`✅ CNPJ extraído da URL: ${cnpjFromUrl}`)
+      return cnpjFromUrl
+    }
 
-    return null
+    // 2. Buscar por nome da empresa via ReceitaWS
+    const cnpj = await cnpjFinder.findCNPJByName(companyName)
+
+    return cnpj
   }
 
   /**
@@ -195,9 +204,13 @@ export class LeadOrchestratorService {
     console.log(`   - Gupy: ${gupyJobs.length}`)
     console.log(`   - Catho: ${cathoJobs.length}`)
 
+    // Filtrar vagas irrelevantes
+    const relevantJobs = allJobs.filter(job => this.isRelevantJob(job.jobTitle))
+    console.log(`🔍 Vagas relevantes após filtro: ${relevantJobs.length}`)
+
     let successCount = 0
 
-    for (const job of allJobs) {
+    for (const job of relevantJobs) {
       const leadId = await this.processJobListing(job)
       if (leadId) {
         successCount++
@@ -210,6 +223,75 @@ export class LeadOrchestratorService {
     console.log(`✅ ${successCount} leads criados com sucesso`)
 
     return successCount
+  }
+
+  /**
+   * Verifica se a vaga é relevante para Controladoria/BPO Financeiro
+   */
+  private isRelevantJob(jobTitle: string): boolean {
+    const lowerTitle = jobTitle.toLowerCase()
+
+    // Termos que DEVEM estar presentes
+    const relevantTerms = [
+      'controller',
+      'controladoria',
+      'financeiro',
+      'financeira',
+      'contábil',
+      'contabilidade',
+      'cfo',
+      'bpo',
+      'fiscal',
+      'tesouraria',
+      'contas a pagar',
+      'contas a receber',
+      'faturamento',
+      'budget',
+      'planejamento financeiro'
+    ]
+
+    // Termos que NÃO devem estar presentes (vagas irrelevantes)
+    const irrelevantTerms = [
+      'marketing',
+      'vendas',
+      'comercial',
+      'ti',
+      'tecnologia',
+      'desenvolvedor',
+      'engenheiro',
+      'designer',
+      'produtor',
+      'eventos',
+      'rh',
+      'recursos humanos',
+      'logística',
+      'operações',
+      'atendimento',
+      'customer success',
+      'suporte'
+    ]
+
+    // Verificar se tem termos irrelevantes
+    const hasIrrelevantTerms = irrelevantTerms.some(term =>
+      lowerTitle.includes(term)
+    )
+
+    if (hasIrrelevantTerms) {
+      console.log(`⏭️  Pulando vaga irrelevante: ${jobTitle}`)
+      return false
+    }
+
+    // Verificar se tem pelo menos um termo relevante
+    const hasRelevantTerms = relevantTerms.some(term =>
+      lowerTitle.includes(term)
+    )
+
+    if (!hasRelevantTerms) {
+      console.log(`⏭️  Pulando vaga sem termos relevantes: ${jobTitle}`)
+      return false
+    }
+
+    return true
   }
 
   private sleep(ms: number): Promise<void> {

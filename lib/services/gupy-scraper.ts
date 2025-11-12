@@ -50,9 +50,9 @@ export class GupyScraperService {
 
     if (isRelevant) {
       mockJobs.push({
-        title: "Analista de Controladoria",
-        company: "Lojas Americanas S.A.",
-        companyUrl: "https://www.americanas.com.br",
+        jobTitle: "Analista de Controladoria",
+        companyName: "Lojas Americanas S.A.",
+        jobUrl: "https://portal.gupy.io/job/lojas-americanas-analista-controladoria",
         description: `
 Estamos em busca de um Analista de Controladoria para integrar nosso time financeiro.
 
@@ -74,9 +74,9 @@ Requisitos:
       })
 
       mockJobs.push({
-        title: "Coordenador de Controladoria",
-        company: "Carrefour Brasil",
-        companyUrl: "https://www.carrefour.com.br",
+        jobTitle: "Coordenador de Controladoria",
+        companyName: "Carrefour Brasil",
+        jobUrl: "https://www.carrefour.com.br",
         description: `
 Buscamos Coordenador de Controladoria para liderar equipe de 8 pessoas.
 
@@ -93,15 +93,14 @@ Requisitos:
 - Experiência em coordenação de equipes
 - Inglês intermediário
         `.trim(),
-        jobUrl: "https://portal.gupy.io/job/carrefour-coordenador-controladoria",
         postedDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 dias atrás
-        candidateCount: 156,
+        applicants: 156,
       })
 
       mockJobs.push({
-        title: "Gerente Financeiro",
-        company: "Grupo Fleury",
-        companyUrl: "https://www.fleury.com.br",
+        jobTitle: "Gerente Financeiro",
+        companyName: "Grupo Fleury",
+        jobUrl: "https://portal.gupy.io/job/grupo-fleury-gerente-financeiro",
         description: `
 Estamos contratando Gerente Financeiro para liderar área de planejamento e controladoria.
 
@@ -119,9 +118,8 @@ Requisitos:
 - Forte conhecimento em modelagem financeira
 - Excel avançado e Power BI
         `.trim(),
-        jobUrl: "https://portal.gupy.io/job/grupo-fleury-gerente-financeiro",
         postedDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 dia atrás
-        candidateCount: 203,
+        applicants: 203,
       })
     }
 
@@ -168,13 +166,13 @@ Requisitos:
    */
   private transformGupyJobs(gupyData: any[]): LinkedInJobData[] {
     return gupyData.map(job => ({
-      title: job.name || job.title,
-      company: job.companyName || job.company?.name,
-      companyUrl: job.company?.website,
-      description: job.description || '',
+      jobTitle: job.name || job.title,
+      companyName: job.companyName || job.company?.name,
       jobUrl: `https://portal.gupy.io/job/${job.id}`,
+      description: job.description || '',
       postedDate: new Date(job.publishedDate || job.createdAt),
-      candidateCount: job.applicationCount || undefined,
+      applicants: job.applicationCount || 0,
+      cnpj: null,
     }))
   }
 }
