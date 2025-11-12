@@ -26,8 +26,19 @@ npm run db:seed          # Seed database with example data
 
 ### Testing & Scripts
 ```bash
+# AI & Enrichment
 npx tsx scripts/test-ai-insights.ts           # Test Claude AI integration
 npx tsx scripts/regenerate-leads-with-ai.ts   # Regenerate lead insights with AI
+
+# Scraping & APIs
+npx tsx scripts/test-linkedin-scraper.ts      # Test LinkedIn scraper (Puppeteer + Bright Data)
+npx tsx scripts/test-serp-api.ts              # Test SERP API (Google search)
+npx tsx scripts/test-web-unlocker.ts          # Test Web Unlocker (Gupy, Catho, InfoJobs)
+npx tsx scripts/test-multi-source-scraping.ts # Test all scrapers together
+
+# Database
+npx tsx scripts/recalculate-priority-scores.ts # Recalculate priority scores for all leads
+npx tsx scripts/populate-db.ts                 # Populate database with test data
 ```
 
 ### API Testing
@@ -62,10 +73,20 @@ Orchestrated by: `lib/services/lead-orchestrator.ts`
 
 All external API integrations are abstracted in `lib/services/`:
 
-- **`linkedin-scraper.ts`**: Bright Data API wrapper (base implementation, requires API key)
+**Scraping Services:**
+- **`linkedin-scraper.ts`**: Bright Data Puppeteer for LinkedIn job scraping (real browser automation)
+- **`serp-api.ts`**: Bright Data SERP API for Google search results (multi-source discovery)
+- **`web-unlocker.ts`**: Bright Data Web Unlocker for Brazilian sites (Gupy, Catho, InfoJobs)
+- **`gupy-scraper.ts`**: Mock Gupy scraper (ready for real integration)
+- **`catho-scraper.ts`**: Mock Catho scraper (ready for real integration)
+
+**Enrichment Services:**
 - **`company-enrichment.ts`**: BrasilAPI integration for CNPJ data (functional, free)
 - **`ai-insights.ts`**: Claude AI for generating suggested contacts and approach triggers (functional)
 - **`email-finder.ts`**: Hunter.io integration for corporate emails (configured, 50 searches/month)
+- **`priority-score.ts`**: Smart priority scoring algorithm (0-100 points)
+
+**Orchestration:**
 - **`lead-orchestrator.ts`**: Coordinates entire pipeline, handles errors, manages API rate limits
 
 **Key Pattern**: Each service is a class with singleton export. Services handle their own API keys from environment variables and gracefully degrade if keys are missing.
@@ -116,14 +137,23 @@ Next.js 14 App Router with route groups:
 ### Environment Variables
 
 Required for full functionality:
-```
-DATABASE_URL           # SQLite: file:./dev.db, Postgres: postgresql://...
-NEXTAUTH_URL           # http://localhost:3000 (prod: your domain)
-NEXTAUTH_SECRET        # Min 32 chars, generate with: openssl rand -base64 32
-CRON_SECRET            # Protects cron endpoint
-CLAUDE_API_KEY         # Anthropic API key (claude-3-5-haiku-20241022)
-HUNTER_IO_API_KEY      # Hunter.io for email finding
-BRIGHT_DATA_API_KEY    # Optional, for LinkedIn scraping
+```bash
+# Database
+DATABASE_URL="file:./dev.db"  # SQLite for dev, PostgreSQL for prod
+
+# Authentication
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="generate-with-openssl-rand-base64-32"
+CRON_SECRET="your-cron-secret"
+
+# Bright Data - Scraping APIs
+BRIGHT_DATA_PUPPETEER_URL="wss://brd-customer-hl_xxxxx:password@brd.superproxy.io:9222"
+BRIGHT_DATA_UNLOCKER_KEY="your-api-key"     # Web Unlocker (Gupy, Catho, InfoJobs)
+BRIGHT_DATA_SERP_KEY="your-api-key"         # SERP API (Google search)
+
+# AI & Enrichment
+CLAUDE_API_KEY="sk-ant-api03-..."           # Claude AI (insights generation)
+HUNTER_IO_API_KEY="your-hunter-key"         # Email finder
 ```
 
 ## Critical Implementation Details
@@ -136,6 +166,71 @@ The Claude API integration (`lib/services/ai-insights.ts`) uses a carefully craf
 **Fallback**: If API fails, returns generic insights based on job title pattern matching.
 
 The AI response is parsed as JSON. If parsing fails, falls back to defaults. Always test with `scripts/test-ai-insights.ts` after modifying the prompt.
+
+### Bright Data Integration
+
+LeapScout uses 3 different Bright Data APIs for comprehensive job scraping:
+
+#### 1. **Puppeteer Browser** (LinkedIn, complex sites)
+**Use case**: LinkedIn job scraping via real browser automation
+**Endpoint**: WebSocket connection to remote Chrome browser
+**Features**:
+- Full JavaScript rendering
+- Automatic anti-bot bypass
+- IP rotation (15,000 req/min limit)
+- Handles dynamic content
+
+**Implementation**: `lib/services/linkedin-scraper.ts`
+```typescript
+const browser = await puppeteer.connect({
+  browserWSEndpoint: process.env.BRIGHT_DATA_PUPPETEER_URL
+})
+```
+
+**Rate Limits**: 15,000 requests/minute (shared across account)
+**Cost**: ~$0.001-0.003 per page load
+
+#### 2. **SERP API** (Google search)
+**Use case**: Multi-source job discovery via Google search
+**Endpoint**: `https://api.brightdata.com/request` (zone: serp_api1)
+**Features**:
+- Extract Google search results as JSON
+- Find jobs across multiple platforms
+- Bypass Google's anti-scraping
+
+**Implementation**: `lib/services/serp-api.ts`
+```typescript
+await serpApi.searchJobs('Controller São Paulo', 'linkedin.com/jobs')
+```
+
+**Response format**: `{ status_code, headers, body }` where body contains HTML
+**Note**: Currently returns HTML instead of structured JSON. Consider using Puppeteer for parsing or switching to another SERP provider.
+
+#### 3. **Web Unlocker** (Brazilian job sites)
+**Use case**: Scraping Gupy, Catho, InfoJobs with anti-bot bypass
+**Endpoint**: `https://api.brightdata.com/request` (zone: web_unlocker1)
+**Features**:
+- Automatic CAPTCHA solving
+- IP rotation and geo-targeting
+- Returns raw HTML for parsing
+
+**Implementation**: `lib/services/web-unlocker.ts`
+```typescript
+const html = await webUnlocker.fetchPage('https://portal.gupy.io/...')
+const $ = cheerio.load(html)
+// Parse with cheerio selectors
+```
+
+**Best Practices**:
+- Use Puppeteer for sites requiring full browser (LinkedIn)
+- Use Web Unlocker for simpler sites (Gupy, Catho, InfoJobs)
+- Use SERP API for discovery (finding new job sources)
+- Implement delays between requests to avoid rate limits
+- Cache responses when possible
+- Handle rate limit errors gracefully (implement retry with exponential backoff)
+
+**MCP Integration**:
+Bright Data MCP server is configured in `.claude/mcp.json` for direct API access during development.
 
 ### Cron Job Configuration
 
