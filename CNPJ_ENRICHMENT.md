@@ -59,19 +59,23 @@ Prisma.company.create()
 
 ## 💾 Database Local de CNPJs
 
-### Empresas Incluídas (30+)
+### Empresas Incluídas (78+ empresas)
 
-**Varejo**: Magazine Luiza, Lojas Americanas, Via Varejo, Casas Bahia, Carrefour, Pão de Açúcar
+**Varejo (12)**: Magazine Luiza, Lojas Americanas, Via Varejo, Casas Bahia, Ponto Frio, Carrefour, Pão de Açúcar, Extra, Renner, C&A, Riachuelo, Mercado Livre
 
-**Indústria**: Petrobras, Vale, Ambev, Natura, Embraer, Gerdau
+**Indústria (12)**: Petrobras, Vale, Ambev, Natura, Embraer, Gerdau, Usiminas, Braskem, Suzano, Klabin, CSN, Ultrapar
 
-**Bancos**: Banco do Brasil, Bradesco, Itaú, Santander, Caixa Econômica
+**Bancos e Financeiras (10)**: Banco do Brasil, Bradesco, Itaú, Santander, Caixa Econômica, BTG Pactual, Inter, Nubank, XP, Safra
 
-**Tecnologia**: TOTVS, Stefanini, CI&T
+**Tecnologia (12)**: TOTVS, Stefanini, CI&T, Locaweb, Movile, Stone, PagSeguro, Positivo, Tempo Assist, Senior Sistemas, Linx
 
-**Saúde**: Grupo Fleury, DASA, Rede D'Or
+**Saúde (8)**: Grupo Fleury, DASA, Rede D'Or, Hapvida, Unimed, Amil, SulAmérica, NotreDame Intermédica
 
-**Alimentos**: BRF, JBS, Marfrig
+**Alimentos e Bebidas (10)**: BRF, JBS, Marfrig, Minerva, Coca-Cola, Nestlé, Unilever, Seara, Sadia, Perdigão
+
+**Energia e Utilities (8)**: Eletrobras, Cemig, Copel, Light, Equatorial, Neoenergia, Enel, AES
+
+**Telecomunicações (6)**: Vivo, Claro, TIM, Oi, Embratel, Nextel
 
 ### Como Adicionar Novos CNPJs
 

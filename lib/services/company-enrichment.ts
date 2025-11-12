@@ -1,14 +1,23 @@
 // Company Enrichment Service
 import { CompanyEnrichmentData } from "@/types"
+import { prisma } from "@/lib/prisma"
 
 export class CompanyEnrichmentService {
   /**
    * Busca dados da empresa na Receita Federal via CNPJ
+   * Usa cache para evitar requisições duplicadas
    */
   async getCompanyByCNPJ(cnpj: string): Promise<CompanyEnrichmentData | null> {
     try {
       // Remover caracteres não numéricos do CNPJ
       const cleanCNPJ = cnpj.replace(/\D/g, '')
+
+      // 1. Verificar cache primeiro
+      const cached = await this.getFromCache(cleanCNPJ)
+      if (cached) {
+        console.log(`💾 [Enrichment] Usando cache para CNPJ: ${cleanCNPJ}`)
+        return cached
+      }
 
       console.log(`[Enrichment] Buscando dados para CNPJ: ${cleanCNPJ}`)
 
@@ -34,16 +43,133 @@ export class CompanyEnrichmentService {
 
       console.log(`✅ [Enrichment] Dados enriquecidos: ${data.nome_fantasia || data.razao_social}`)
 
-      return {
+      const enrichmentData = {
         cnpj: data.cnpj,
         revenue: this.estimateRevenue(data.capital_social),
         employees: this.estimateEmployees(data.porte),
         sector: data.cnae_fiscal_descricao,
         website: data.email ? `https://${data.email.split('@')[1]}` : undefined,
       }
+
+      // 2. Salvar no cache para uso futuro (expira em 30 dias)
+      await this.saveToCache(cleanCNPJ, data)
+
+      return enrichmentData
     } catch (error) {
       console.error('❌ [Enrichment] Erro ao buscar dados da Receita Federal:', error)
+
+      // Salvar erro no cache para não tentar novamente (expira em 1 dia)
+      await this.saveErrorToCache(cleanCNPJ, error instanceof Error ? error.message : 'Unknown error')
+
       return null
+    }
+  }
+
+  /**
+   * Busca dados do cache
+   */
+  private async getFromCache(cnpj: string): Promise<CompanyEnrichmentData | null> {
+    try {
+      const cached = await prisma.enrichmentCache.findUnique({
+        where: { cnpj },
+      })
+
+      if (!cached) {
+        return null
+      }
+
+      // Verificar se cache expirou
+      if (new Date() > cached.expiresAt) {
+        // Cache expirado, deletar
+        await prisma.enrichmentCache.delete({ where: { cnpj } })
+        return null
+      }
+
+      // Se não teve sucesso na última busca, retornar null
+      if (!cached.success) {
+        return null
+      }
+
+      // Retornar dados do cache
+      return {
+        cnpj: cached.cnpj,
+        revenue: this.estimateRevenue(cached.capitalSocial || undefined),
+        employees: this.estimateEmployees(cached.porte || undefined),
+        sector: cached.sector || undefined,
+        website: cached.website || undefined,
+      }
+    } catch (error) {
+      console.error('Erro ao buscar cache:', error)
+      return null
+    }
+  }
+
+  /**
+   * Salva dados no cache
+   */
+  private async saveToCache(cnpj: string, data: any): Promise<void> {
+    try {
+      const expiresAt = new Date()
+      expiresAt.setDate(expiresAt.getDate() + 30) // Expira em 30 dias
+
+      await prisma.enrichmentCache.upsert({
+        where: { cnpj },
+        update: {
+          razaoSocial: data.razao_social,
+          nomeFantasia: data.nome_fantasia,
+          capitalSocial: data.capital_social,
+          porte: data.porte,
+          sector: data.cnae_fiscal_descricao,
+          website: data.email ? `https://${data.email.split('@')[1]}` : null,
+          success: true,
+          errorMessage: null,
+          expiresAt,
+        },
+        create: {
+          cnpj,
+          razaoSocial: data.razao_social,
+          nomeFantasia: data.nome_fantasia,
+          capitalSocial: data.capital_social,
+          porte: data.porte,
+          sector: data.cnae_fiscal_descricao,
+          website: data.email ? `https://${data.email.split('@')[1]}` : null,
+          success: true,
+          expiresAt,
+        },
+      })
+
+      console.log(`💾 [Cache] Dados salvos para CNPJ: ${cnpj}`)
+    } catch (error) {
+      console.error('Erro ao salvar cache:', error)
+    }
+  }
+
+  /**
+   * Salva erro no cache para não tentar novamente por 1 dia
+   */
+  private async saveErrorToCache(cnpj: string, errorMessage: string): Promise<void> {
+    try {
+      const expiresAt = new Date()
+      expiresAt.setDate(expiresAt.getDate() + 1) // Expira em 1 dia
+
+      await prisma.enrichmentCache.upsert({
+        where: { cnpj },
+        update: {
+          success: false,
+          errorMessage,
+          expiresAt,
+        },
+        create: {
+          cnpj,
+          success: false,
+          errorMessage,
+          expiresAt,
+        },
+      })
+
+      console.log(`💾 [Cache] Erro salvo para CNPJ: ${cnpj}`)
+    } catch (error) {
+      console.error('Erro ao salvar erro no cache:', error)
     }
   }
 

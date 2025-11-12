@@ -39,6 +39,19 @@ model Company {
   location    String?   // Endereço completo
   website     String?
   linkedinUrl String?
+
+  // AI Enrichment Data
+  estimatedRevenue    String?  // Faixa estimada via IA (ex: "R$ 50M - R$ 100M")
+  estimatedEmployees  String?  // Faixa estimada via IA (ex: "200-500")
+  recentNews          String?  // JSON: Array de notícias recentes
+  upcomingEvents      String?  // JSON: Array de eventos futuros
+  instagramHandle     String?  // @usuario do Instagram
+  instagramFollowers  String?  // Seguidores estimados
+  linkedinFollowers   String?  // Seguidores no LinkedIn
+  industryPosition    String?  // Posição no mercado (líder, challenger, etc)
+  keyInsights         String?  // JSON: Array de insights chave
+  enrichedAt          DateTime? // Última vez que foi enriquecida com IA
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -116,6 +129,33 @@ model ScrapeLog {
 
   @@index([createdAt])
   @@map("scrape_logs")
+}
+
+// ============================================
+// ENRICHMENT CACHE MODEL
+// ============================================
+model EnrichmentCache {
+  id          String   @id @default(uuid())
+  cnpj        String   @unique
+
+  // Dados enriquecidos
+  razaoSocial String?
+  nomeFantasia String?
+  capitalSocial Float?
+  porte       String?
+  sector      String?
+  website     String?
+
+  // Metadados do cache
+  success     Boolean  @default(true)
+  errorMessage String?
+  expiresAt   DateTime // Cache expira após 30 dias
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([cnpj])
+  @@index([expiresAt])
+  @@map("enrichment_cache")
 }
 
 // ============================================

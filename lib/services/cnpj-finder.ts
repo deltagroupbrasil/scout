@@ -3,7 +3,7 @@
 
 // Database de CNPJs de empresas grandes brasileiras conhecidas
 const KNOWN_CNPJS: Record<string, string> = {
-  // Varejo
+  // Varejo (12 empresas)
   'magazine luiza': '47960950000121',
   'magazineluiza': '47960950000121',
   'magalu': '47960950000121',
@@ -16,36 +16,90 @@ const KNOWN_CNPJS: Record<string, string> = {
   'pao de acucar': '47508411042824',
   'grupo pao de acucar': '47508411042824',
   'extra': '47508411042824',
+  'renner': '92754738000162',
+  'c&a': '45242914000105',
+  'riachuelo': '33042730000104',
+  'mercado livre': '10573521000191',
 
-  // Indústria
+  // Indústria (12 empresas)
   'petrobras': '33000167000101',
   'vale': '33592510000154',
   'ambev': '02808708000169',
   'natura': '71673990000177',
   'embraer': '07689002000189',
   'gerdau': '33611500000184',
+  'usiminas': '60894730000102',
+  'braskem': '42150391000110',
+  'suzano': '16404287000155',
+  'klabin': '89637490000145',
+  'csn': '33042730000104',
+  'ultrapar': '33256439000139',
 
-  // Bancos
+  // Bancos e Financeiras (10 empresas)
   'banco do brasil': '00000000000191',
   'bradesco': '60746948000112',
   'itau': '60701190000104',
   'santander': '90400888000142',
   'caixa economica': '00360305000104',
+  'btg pactual': '30306294000145',
+  'inter': '00416968000101',
+  'nubank': '18236120000158',
+  'xp': '02332886000104',
+  'safra': '58160789000128',
 
-  // Tecnologia
+  // Tecnologia (12 empresas)
   'totvs': '53113791000122',
   'stefanini': '58069360000120',
   'ci&t': '02380557000165',
+  'locaweb': '02550477000162',
+  'movile': '09345250000138',
+  'stone': '16501555000157',
+  'pagseguro': '08561701000101',
+  'positivo': '81243735000148',
+  'tempo assist': '02127738000174',
+  'senior': '80138731000135',
+  'linx': '06948969000102',
+  'senior sistemas': '80138731000135',
 
-  // Saúde
+  // Saúde (8 empresas)
   'grupo fleury': '60840055000131',
   'dasa': '61486650000183',
   'rede dor': '29585447000160',
+  'hapvida': '02748406000197',
+  'unimed': '06981794000156',
+  'amil': '29309127000182',
+  'sulamerica': '01685053000104',
+  'notredame intermédica': '43162590000100',
 
-  // Alimentos
+  // Alimentos e Bebidas (10 empresas)
   'brf': '01838723000127',
   'jbs': '02916265000160',
   'marfrig': '03853896000140',
+  'minerva': '67620377000141',
+  'coca cola': '61186888000184',
+  'nestle': '60409075001152',
+  'unilever': '61068276000171',
+  'seara': '01838723000127',
+  'sadia': '01838723000127',
+  'perdigao': '01838723000127',
+
+  // Energia e Utilities (8 empresas)
+  'eletrobras': '00001180000126',
+  'cemig': '17155730000164',
+  'copel': '76483817000120',
+  'light': '60444437000168',
+  'equatorial': '03220438000143',
+  'neoenergia': '01083200000118',
+  'enel': '08730650000145',
+  'aes': '04128563000113',
+
+  // Telecomunicações (6 empresas)
+  'vivo': '02558157000162',
+  'claro': '40432544000147',
+  'tim': '02421421000111',
+  'oi': '76535764000143',
+  'embratel': '33530486000107',
+  'nextel': '66970229000178',
 }
 
 export class CNPJFinderService {

@@ -36,6 +36,11 @@ function formatRevenue(revenue: number | null | undefined): string {
   }).format(revenue)
 }
 
+function formatEmployees(employees: number | null | undefined): string {
+  if (!employees) return '-'
+  return new Intl.NumberFormat('pt-BR').format(employees)
+}
+
 function getPriorityBadge(score: number) {
   if (score >= 80) {
     return { label: 'Muito Alta', className: 'bg-red-100 text-red-800' }
@@ -69,6 +74,7 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
           <TableRow>
             <TableHead>Empresa</TableHead>
             <TableHead>Faturamento</TableHead>
+            <TableHead>Funcionários</TableHead>
             <TableHead>Cargo</TableHead>
             <TableHead>Prioridade</TableHead>
             <TableHead>Status</TableHead>
@@ -106,6 +112,11 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
                 <TableCell>
                   <Link href={`/dashboard/leads/${lead.id}`} className="block">
                     {formatRevenue(lead.company.revenue)}
+                  </Link>
+                </TableCell>
+                <TableCell>
+                  <Link href={`/dashboard/leads/${lead.id}`} className="block">
+                    {formatEmployees(lead.company.employees)}
                   </Link>
                 </TableCell>
                 <TableCell>

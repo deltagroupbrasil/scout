@@ -43,6 +43,11 @@ npx tsx scripts/clear-leads.ts                 # Clear all leads and companies f
 npx tsx scripts/check-companies.ts             # Check companies data (CNPJ, revenue, employees)
 npx tsx scripts/enrich-companies.ts            # Enrich companies with CNPJ using Receita Federal API
 npx tsx scripts/test-cnpj-finder.ts            # Test CNPJ finder service
+
+# Bright Data Contact Scraping
+npx tsx scripts/test-bright-data-linkedin.ts       # Test LinkedIn profile scraping
+npx tsx scripts/test-bright-data-company-page.ts   # Test company contact page scraping
+npx tsx scripts/test-bright-data-full-enrichment.ts # Test complete enrichment pipeline
 ```
 
 ### API Testing
