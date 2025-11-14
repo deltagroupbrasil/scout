@@ -59,7 +59,6 @@ export async function GET(request: NextRequest) {
           }
         },
         orderBy: [
-          { isNew: 'desc' },
           { priorityScore: 'desc' },
           { createdAt: 'desc' }
         ],
