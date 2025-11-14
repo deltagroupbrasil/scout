@@ -28,11 +28,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Filtro de busca por nome da empresa
+    // SQLite não suporta mode: 'insensitive', usa LIKE case-insensitive por padrão
     if (search) {
       where.company = {
         name: {
-          contains: search,
-          mode: 'insensitive'
+          contains: search
         }
       }
     }
@@ -60,6 +60,7 @@ export async function GET(request: NextRequest) {
         },
         orderBy: [
           { isNew: 'desc' },
+          { priorityScore: 'desc' },
           { createdAt: 'desc' }
         ],
         skip: (page - 1) * pageSize,

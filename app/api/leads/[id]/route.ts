@@ -66,12 +66,23 @@ export async function PATCH(
     const body = await request.json()
     const { status, isNew } = body
 
+    // Quando o status muda de NEW para qualquer outro, marca isNew como false
+    // Mas se voltar para NEW, NÃO muda o isNew (deixa como estava)
+    const updateData: any = {
+      ...(status && { status }),
+      ...(isNew !== undefined && { isNew })
+    }
+
+    // Se o status está sendo atualizado para CONTACTED, QUALIFIED ou DISCARDED,
+    // automaticamente marca isNew como false
+    // IMPORTANTE: Se voltar para NEW, não altera isNew
+    if (status && status !== 'NEW' && isNew === undefined) {
+      updateData.isNew = false
+    }
+
     const lead = await prisma.lead.update({
       where: { id },
-      data: {
-        ...(status && { status }),
-        ...(isNew !== undefined && { isNew })
-      },
+      data: updateData,
       include: {
         company: true
       }
