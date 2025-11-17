@@ -34,7 +34,7 @@ export class EventsDetectorService {
   }
 
   /**
-   * Detecta eventos relevantes da empresa
+   * Detecta eventos relevantes da empresa usando Claude API com web search
    */
   async detectEvents(
     companyName: string,
@@ -48,45 +48,98 @@ export class EventsDetectorService {
   ): Promise<EventDetectionResult> {
     console.log(`\n [Event Detector] Detectando eventos: ${companyName}`)
 
-    const sources: string[] = []
-    const allEvents: CompanyEvent[] = []
-
-    // 1. Buscar notícias via Google News
-    if (this.serpApiKey) {
-      console.log('   📰 Buscando notícias no Google News...')
-      const newsEvents = await this.searchCompanyNews(companyName)
-      allEvents.push(...newsEvents)
-      if (newsEvents.length > 0) sources.push('Google News')
+    if (!this.anthropic) {
+      console.log('    Claude API nao configurada')
+      return { events: [], detectedAt: new Date(), sources: [] }
     }
 
-    // 2. Analisar redes sociais (se verificadas)
-    if (socialMedia?.linkedin) {
-      console.log('   💼 Analisando LinkedIn...')
-      // Nota: Bright Data LinkedIn Scraper poderia ser usado aqui
-      sources.push('LinkedIn')
+    try {
+      // Usar Claude API com web search para buscar noticias e eventos
+      const message = await this.anthropic.messages.create({
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: 2000,
+        tools: [
+          {
+            type: 'web_search_20250305',
+            name: 'web_search',
+            max_uses: 3
+          }
+        ],
+        messages: [
+          {
+            role: 'user',
+            content: `Encontre as 5 noticias ou eventos mais recentes e relevantes sobre a empresa "${companyName}" no Brasil.
+
+INSTRUCOES:
+1. Use web_search para buscar noticias dos ultimos 30 dias
+2. Foque em eventos relevantes para prospecção B2B:
+   - Mudancas de lideranca (novo CEO, CFO, Diretor)
+   - Rodadas de investimento ou expansao
+   - Premios ou reconhecimentos
+   - Lancamentos de produtos importantes
+   - Participacao em eventos do setor
+
+3. Retorne APENAS um JSON no formato:
+{
+  "events": [
+    {
+      "type": "news|leadership_change|funding|award|product_launch|conference|expansion",
+      "title": "Titulo da noticia",
+      "description": "Resumo em ate 150 caracteres",
+      "date": "YYYY-MM-DD",
+      "source": "Nome da fonte",
+      "sourceUrl": "URL da noticia",
+      "relevance": "high|medium|low",
+      "sentiment": "positive|neutral|negative"
     }
+  ]
+}
 
-    if (socialMedia?.twitter) {
-      console.log('   🐦 Analisando Twitter...')
-      // Nota: Twitter API ou Bright Data poderia ser usado
-      sources.push('Twitter')
-    }
+4. Se nao encontrar noticias relevantes, retorne: {"events": []}
 
-    // 3. Se temos eventos, usar IA para categorizar e filtrar relevância
-    let finalEvents: CompanyEvent[] = []
-    if (allEvents.length > 0 && this.anthropic) {
-      console.log(`    Analisando ${allEvents.length} eventos com IA...`)
-      finalEvents = await this.categorizeEventsWithAI(companyName, allEvents)
-    } else {
-      finalEvents = allEvents
-    }
+Empresa: ${companyName}`
+          }
+        ]
+      })
 
-    console.log(`    ${finalEvents.length} eventos relevantes detectados`)
+      // Parse resposta
+      for (const block of message.content) {
+        if (block.type === 'text') {
+          const text = block.text
 
-    return {
-      events: finalEvents,
-      detectedAt: new Date(),
-      sources
+          // Buscar JSON na resposta
+          const jsonMatch = text.match(/\{[\s\S]*"events"[\s\S]*\}/)
+          if (jsonMatch) {
+            const response = JSON.parse(jsonMatch[0])
+
+            const events: CompanyEvent[] = response.events.map((e: any) => ({
+              type: e.type || 'news',
+              title: e.title,
+              description: e.description,
+              date: e.date ? new Date(e.date) : new Date(),
+              source: e.source || 'Web Search',
+              sourceUrl: e.sourceUrl,
+              relevance: e.relevance || 'medium',
+              sentiment: e.sentiment || 'neutral'
+            }))
+
+            console.log(`    ${events.length} eventos encontrados`)
+
+            return {
+              events,
+              detectedAt: new Date(),
+              sources: ['Claude AI + Web Search']
+            }
+          }
+        }
+      }
+
+      console.log('    Nenhum evento encontrado')
+      return { events: [], detectedAt: new Date(), sources: [] }
+
+    } catch (error) {
+      console.error('    Erro ao detectar eventos:', error)
+      return { events: [], detectedAt: new Date(), sources: [] }
     }
   }
 

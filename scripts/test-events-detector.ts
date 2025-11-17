@@ -1,6 +1,8 @@
 // Test Events Detector
 // Testa a detecção de eventos relevantes da empresa
 
+require('dotenv').config()
+
 import { eventsDetector } from '../lib/services/events-detector'
 
 async function testEventsDetector() {
