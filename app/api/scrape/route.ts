@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { query } = body
+    const { query, maxCompanies = 20 } = body
 
     if (!query) {
       return NextResponse.json(
@@ -25,8 +25,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Executar scraping
-    const count = await leadOrchestrator.scrapeAndProcessLeads(query)
+    // Executar scraping com limite de empresas
+    const count = await leadOrchestrator.scrapeAndProcessLeads(query, maxCompanies)
 
     return NextResponse.json({
       success: true,

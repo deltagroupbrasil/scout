@@ -12,11 +12,15 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import { LeadWithCompany } from "@/types"
 import { LeadStatus } from "@prisma/client"
 
 interface LeadsTableProps {
   leads: LeadWithCompany[]
+  selectedLeadIds?: string[]
+  onSelectLead?: (leadId: string) => void
+  onSelectAll?: (selected: boolean) => void
 }
 
 const STATUS_CONFIG: Record<LeadStatus, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -57,7 +61,15 @@ function getPriorityBadge(score: number) {
   return { label: 'Muito Baixa', className: 'bg-blue-100 text-blue-800' }
 }
 
-export default function LeadsTable({ leads }: LeadsTableProps) {
+export default function LeadsTable({
+  leads,
+  selectedLeadIds = [],
+  onSelectLead,
+  onSelectAll
+}: LeadsTableProps) {
+  const allSelected = leads.length > 0 && selectedLeadIds.length === leads.length
+  const someSelected = selectedLeadIds.length > 0 && !allSelected
+
   if (leads.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -72,6 +84,16 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
       <Table>
         <TableHeader>
           <TableRow>
+            {onSelectAll && (
+              <TableHead className="w-12">
+                <Checkbox
+                  checked={allSelected}
+                  onCheckedChange={(checked) => onSelectAll(!!checked)}
+                  aria-label="Selecionar todos"
+                  className={someSelected ? "opacity-50" : ""}
+                />
+              </TableHead>
+            )}
             <TableHead>Empresa</TableHead>
             <TableHead>Faturamento</TableHead>
             <TableHead>Funcionários</TableHead>
@@ -89,9 +111,22 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
               addSuffix: true,
               locale: ptBR
             })
+            const isSelected = selectedLeadIds.includes(lead.id)
 
             return (
-              <TableRow key={lead.id} className="cursor-pointer hover:bg-gray-50">
+              <TableRow
+                key={lead.id}
+                className={`cursor-pointer hover:bg-gray-50 ${isSelected ? 'bg-blue-50' : ''}`}
+              >
+                {onSelectLead && (
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={() => onSelectLead(lead.id)}
+                      aria-label={`Selecionar ${lead.company.name}`}
+                    />
+                  </TableCell>
+                )}
                 <TableCell>
                   <Link href={`/dashboard/leads/${lead.id}`} className="block">
                     <div className="flex items-center gap-2">

@@ -26,7 +26,7 @@ async function populateWithMockData() {
   let skippedCount = 0
 
   for (const job of allJobs) {
-    console.log(`⏳ Processando: ${job.company} - ${job.title}`)
+    console.log(`⏳ Processando: ${job.companyName} - ${job.jobTitle}`)
 
     try {
       const leadId = await leadOrchestrator.processJobListing(job)

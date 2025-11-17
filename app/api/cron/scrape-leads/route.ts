@@ -47,13 +47,18 @@ export async function GET(request: NextRequest) {
 
     scrapeLogId = scrapeLog.id
 
-    console.log('🚀 Iniciando cron job de scraping...')
+    console.log(' Iniciando cron job de scraping...')
 
     // Query para buscar vagas - termos específicos de Controladoria e BPO Financeiro
-    const query = '(Controller OR "Gerente Financeiro" OR "Coordenador Financeiro" OR "Analista Controladoria" OR "Coordenador Controladoria" OR "Gerente Controladoria" OR "CFO" OR "Diretor Financeiro" OR "Coordenador BPO Financeiro" OR "Analista Contábil") AND (Controladoria OR Financeiro OR Contábil OR BPO) São Paulo'
+    const query = 'Controller OR CFO OR "Gerente Financeiro" OR "Diretor Financeiro" OR Controladoria São Paulo'
 
-    // Executar scraping
-    const leadsCreated = await leadOrchestrator.scrapeAndProcessLeads(query)
+    // Executar scraping com limite de 20 empresas
+    const result = await leadOrchestrator.scrapeAndProcessLeads({
+      query,
+      maxCompanies: 20
+    })
+
+    const leadsCreated = result.savedLeads
 
     const duration = Math.floor((Date.now() - startTime) / 1000)
 
@@ -62,12 +67,14 @@ export async function GET(request: NextRequest) {
       where: { id: scrapeLogId },
       data: {
         status: 'success',
-        leadsCreated,
+        jobsFound: result.totalJobs,
+        leadsCreated: result.savedLeads,
         duration,
+        errors: result.errors.length > 0 ? JSON.stringify(result.errors) : null,
       },
     })
 
-    console.log(`✅ Cron job concluído: ${leadsCreated} leads criados em ${duration}s`)
+    console.log(` Cron job concluído: ${leadsCreated} leads criados em ${duration}s`)
 
     return NextResponse.json({
       success: true,
@@ -76,7 +83,7 @@ export async function GET(request: NextRequest) {
       message: `Scraping concluído com sucesso. ${leadsCreated} leads criados.`,
     })
   } catch (error) {
-    console.error('❌ Erro no cron job:', error)
+    console.error(' Erro no cron job:', error)
 
     const duration = Math.floor((Date.now() - startTime) / 1000)
     const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'

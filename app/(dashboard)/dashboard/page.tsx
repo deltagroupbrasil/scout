@@ -4,12 +4,14 @@ import { useEffect, useState } from "react"
 import { LeadFilters, LeadWithCompany, PaginatedResponse } from "@/types"
 import LeadFiltersComponent from "@/components/dashboard/lead-filters"
 import LeadsTable from "@/components/dashboard/leads-table"
+import BulkActionsBar from "@/components/dashboard/bulk-actions-bar"
 import ScrapeButton from "@/components/dashboard/scrape-button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function DashboardPage() {
   const [leads, setLeads] = useState<LeadWithCompany[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([])
   const [filters, setFilters] = useState<LeadFilters>({
     status: 'ALL',
     dateRange: '30d'
@@ -64,13 +66,41 @@ export default function DashboardPage() {
     window.open(url, '_blank')
   }
 
+  const handleSelectLead = (leadId: string) => {
+    setSelectedLeadIds(prev => {
+      if (prev.includes(leadId)) {
+        return prev.filter(id => id !== leadId)
+      } else {
+        return [...prev, leadId]
+      }
+    })
+  }
+
+  const handleSelectAll = (selected: boolean) => {
+    if (selected) {
+      setSelectedLeadIds(leads.map(lead => lead.id))
+    } else {
+      setSelectedLeadIds([])
+    }
+  }
+
+  const handleClearSelection = () => {
+    setSelectedLeadIds([])
+  }
+
+  const handleActionComplete = () => {
+    fetchLeads()
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-gray-500">
-          Gerencie seus leads de prospecção B2B
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-gray-500">
+            Gerencie seus leads de prospecção B2B
+          </p>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -78,7 +108,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Leads</CardTitle>
-            <span className="text-2xl">📊</span>
+            <span className="text-2xl"></span>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
@@ -91,7 +121,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Leads Novos</CardTitle>
-            <span className="text-2xl">🆕</span>
+            <span className="text-2xl"></span>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.new}</div>
@@ -147,10 +177,22 @@ export default function DashboardPage() {
               <div className="text-gray-500">Carregando...</div>
             </div>
           ) : (
-            <LeadsTable leads={leads} />
+            <LeadsTable
+              leads={leads}
+              selectedLeadIds={selectedLeadIds}
+              onSelectLead={handleSelectLead}
+              onSelectAll={handleSelectAll}
+            />
           )}
         </CardContent>
       </Card>
+
+      {/* Bulk Actions Bar */}
+      <BulkActionsBar
+        selectedLeadIds={selectedLeadIds}
+        onClearSelection={handleClearSelection}
+        onActionComplete={handleActionComplete}
+      />
     </div>
   )
 }

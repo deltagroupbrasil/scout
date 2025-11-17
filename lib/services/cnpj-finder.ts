@@ -1,5 +1,15 @@
 // CNPJ Finder Service
-// Busca CNPJ de empresas brasileiras usando APIs públicas e database de CNPJs conhecidos
+// Busca CNPJ de empresas brasileiras usando múltiplas estratégias:
+// 1. Database local de CNPJs conhecidos
+// 2. Scraping do website da empresa
+// 3. Claude AI com web search
+// 4. Google search via Puppeteer
+// 5. APIs públicas (CNPJA)
+
+import Anthropic from '@anthropic-ai/sdk'
+import * as cheerio from 'cheerio'
+import { webUnlocker } from './web-unlocker'
+import { linkedInScraper } from './linkedin-scraper'
 
 // Database de CNPJs de empresas grandes brasileiras conhecidas
 const KNOWN_CNPJS: Record<string, string> = {
@@ -35,7 +45,7 @@ const KNOWN_CNPJS: Record<string, string> = {
   'csn': '33042730000104',
   'ultrapar': '33256439000139',
 
-  // Bancos e Financeiras (10 empresas)
+  // Bancos e Financeiras (13 empresas)
   'banco do brasil': '00000000000191',
   'bradesco': '60746948000112',
   'itau': '60701190000104',
@@ -46,6 +56,11 @@ const KNOWN_CNPJS: Record<string, string> = {
   'nubank': '18236120000158',
   'xp': '02332886000104',
   'safra': '58160789000128',
+  'pagbank': '33172537000108',
+  'pag bank': '33172537000108',
+  'pagseguro': '08561701000101',
+  'pag seguro': '08561701000101',
+  'pagseguro digital': '08561701000101',
 
   // Tecnologia (12 empresas)
   'totvs': '53113791000122',
@@ -54,7 +69,6 @@ const KNOWN_CNPJS: Record<string, string> = {
   'locaweb': '02550477000162',
   'movile': '09345250000138',
   'stone': '16501555000157',
-  'pagseguro': '08561701000101',
   'positivo': '81243735000148',
   'tempo assist': '02127738000174',
   'senior': '80138731000135',
@@ -103,38 +117,281 @@ const KNOWN_CNPJS: Record<string, string> = {
 }
 
 export class CNPJFinderService {
-  /**
-   * Busca CNPJ por nome da empresa
-   * 1. Tenta database local de CNPJs conhecidos
-   * 2. Tenta APIs públicas (CNPJA)
-   */
-  async findCNPJByName(companyName: string): Promise<string | null> {
-    try {
-      console.log(`[CNPJ Finder] Buscando CNPJ para: "${companyName}"`)
+  private anthropic: Anthropic | null = null
 
-      // 1. Verificar database de CNPJs conhecidos
-      const knownCNPJ = this.searchKnownCNPJs(companyName)
-      if (knownCNPJ) {
-        console.log(`✅ [CNPJ Finder] CNPJ encontrado no database local: ${knownCNPJ}`)
-        return knownCNPJ
+  constructor() {
+    const apiKey = process.env.CLAUDE_API_KEY
+    if (apiKey) {
+      this.anthropic = new Anthropic({ apiKey })
+    }
+  }
+
+  /**
+   * Busca CNPJ por nome da empresa usando APENAS Claude API com web search
+   * Método simplificado conforme solicitado pelo usuário
+   */
+  async findCNPJByName(
+    companyName: string,
+    website?: string
+  ): Promise<string | null> {
+    try {
+      console.log(`\n[CNPJ Finder] Buscando CNPJ para: "${companyName}"`)
+
+      // UNICA ESTRATEGIA: Claude AI com web search
+      if (this.anthropic) {
+        const cnpjFromAI = await this.findViaClaudeAI(companyName)
+        if (cnpjFromAI) {
+          console.log(
+            `   CNPJ encontrado: ${this.formatCNPJDisplay(cnpjFromAI)}\n`
+          )
+          return cnpjFromAI
+        }
+      } else {
+        console.error('   Claude API key nao configurada!')
       }
 
-      // 2. Limpar nome da empresa (remover S.A., LTDA, etc)
-      const cleanName = this.cleanCompanyName(companyName)
-
-      // 3. Tentar buscar via CNPJA API (desabilitado por enquanto - APIs públicas requerem chave)
-      // const cnpj = await this.searchViaCNPJA(cleanName)
-      // if (cnpj) {
-      //   console.log(`✅ [CNPJ Finder] CNPJ encontrado via API: ${cnpj}`)
-      //   return cnpj
-      // }
-
-      console.log(`⚠️  [CNPJ Finder] CNPJ não encontrado para: "${companyName}"`)
+      console.log(`   CNPJ nao encontrado para: "${companyName}"\n`)
       return null
     } catch (error) {
       console.error('[CNPJ Finder] Erro ao buscar CNPJ:', error)
       return null
     }
+  }
+
+  /**
+   * Busca CNPJ no website da empresa (rodapé, página "Sobre", etc)
+   */
+  private async scrapeFromWebsite(website: string): Promise<string | null> {
+    console.log(` [Website] Fazendo scraping de: ${website}`)
+
+    try {
+      const html = await webUnlocker.fetchPage(website)
+      const $ = cheerio.load(html)
+
+      // Buscar em todo o HTML por padrão de CNPJ
+      const text = $('body').text()
+
+      // Padrões de CNPJ
+      const patterns = [
+        /CNPJ[:\s]*(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})/gi,
+        /(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})/g,
+        /CNPJ[:\s]*(\d{14})/gi,
+      ]
+
+      for (const pattern of patterns) {
+        const matches = text.match(pattern)
+        if (matches && matches.length > 0) {
+          // Extrair apenas os dígitos
+          const cnpj = matches[0].replace(/\D/g, '')
+          if (cnpj.length === 14) {
+            return cnpj
+          }
+        }
+      }
+
+      // Buscar em atributos comuns
+      const cnpjFromMeta = $('meta[name="cnpj"]').attr('content')
+      if (cnpjFromMeta) {
+        return cnpjFromMeta.replace(/\D/g, '')
+      }
+
+      return null
+    } catch (error) {
+      console.error('Erro ao fazer scraping do website:', error)
+      return null
+    }
+  }
+
+  /**
+   * Busca CNPJ usando Claude AI com web search (MÉTODO PRINCIPAL)
+   */
+  private async findViaClaudeAI(companyName: string): Promise<string | null> {
+    if (!this.anthropic) return null
+
+    console.log(' [Claude AI + Web Search] Buscando CNPJ...')
+
+    try {
+      const message = await this.anthropic.messages.create({
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: 1000,
+        tools: [
+          {
+            type: 'web_search_20250305',
+            name: 'web_search',
+            max_uses: 5
+          }
+        ],
+        messages: [
+          {
+            role: 'user',
+            content: `Encontre o CNPJ da empresa "${companyName}" usando web search no Google.
+
+INSTRUCOES:
+1. Use web_search para buscar "${companyName} CNPJ Brasil"
+2. Procure em multiplas fontes:
+   - Site oficial da empresa (rodape, pagina "sobre")
+   - Portais de consulta de empresas (CNPJ.biz, ReceitaWS, etc)
+   - Google Knowledge Panel
+   - Noticias sobre a empresa
+3. Retorne APENAS os 14 digitos do CNPJ, sem formatacao
+4. Formato de resposta: CNPJ: 12345678000190
+5. Se nao encontrar com certeza, retorne: NOT_FOUND
+
+Empresa: ${companyName}`,
+          },
+        ],
+      })
+
+      // Parse resposta
+      for (const block of message.content) {
+        if (block.type === 'text') {
+          const text = block.text
+
+          // Buscar padrao "CNPJ: 12345678000190"
+          const match = text.match(/CNPJ:\s*(\d{14})/i)
+          if (match) {
+            const cnpj = match[1]
+            if (this.isValidCNPJ(cnpj)) {
+              console.log(`    Encontrado: ${this.formatCNPJDisplay(cnpj)}`)
+              return cnpj
+            }
+          }
+
+          // Fallback: buscar qualquer sequencia de 14 digitos
+          const cnpjMatch = text.match(/\b(\d{14})\b/)
+          if (cnpjMatch) {
+            const cnpj = cnpjMatch[1]
+            if (this.isValidCNPJ(cnpj)) {
+              console.log(`    Encontrado: ${this.formatCNPJDisplay(cnpj)}`)
+              return cnpj
+            }
+          }
+
+          // Fallback 2: buscar CNPJ formatado (XX.XXX.XXX/XXXX-XX)
+          const formattedMatch = text.match(/(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})/g)
+          if (formattedMatch && formattedMatch.length > 0) {
+            const cnpj = formattedMatch[0].replace(/\D/g, '')
+            if (cnpj.length === 14 && this.isValidCNPJ(cnpj)) {
+              console.log(`    Encontrado: ${this.formatCNPJDisplay(cnpj)}`)
+              return cnpj
+            }
+          }
+        }
+      }
+
+      console.log(`    CNPJ nao encontrado`)
+      return null
+
+    } catch (error) {
+      console.error('Erro ao buscar via Claude AI:', error)
+      return null
+    }
+  }
+
+  /**
+   * Busca CNPJ via Google Search
+   */
+  private async findViaGoogle(companyName: string): Promise<string | null> {
+    console.log(' [Google] Buscando CNPJ...')
+
+    try {
+      const browser = await linkedInScraper['connectBrowser']()
+      const page = await browser.newPage()
+
+      const query = `${companyName} CNPJ Brasil`
+      const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`
+
+      await page.goto(googleUrl, { waitUntil: 'networkidle2', timeout: 30000 })
+
+      // Extrair CNPJ do snippet dos resultados
+      const cnpj = await page.evaluate(() => {
+        // Buscar em todos os snippets
+        const snippets = document.querySelectorAll('.g')
+
+        for (const snippet of snippets) {
+          const text = snippet.textContent || ''
+
+          // Padrões de CNPJ
+          const patterns = [
+            /CNPJ[:\s]*(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})/gi,
+            /(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/g,
+          ]
+
+          for (const pattern of patterns) {
+            const match = text.match(pattern)
+            if (match) {
+              return match[0].replace(/\D/g, '')
+            }
+          }
+        }
+
+        return null
+      })
+
+      await page.close()
+      await browser.disconnect()
+
+      if (cnpj && cnpj.length === 14 && this.isValidCNPJ(cnpj)) {
+        return cnpj
+      }
+
+      return null
+    } catch (error) {
+      console.error('Erro ao buscar via Google:', error)
+      return null
+    }
+  }
+
+  /**
+   * Valida CNPJ usando algoritmo oficial
+   */
+  private isValidCNPJ(cnpj: string): boolean {
+    cnpj = cnpj.replace(/\D/g, '')
+
+    if (cnpj.length !== 14) return false
+
+    // Eliminar CNPJs inválidos conhecidos
+    if (/^(\d)\1{13}$/.test(cnpj)) return false
+
+    // Validar dígitos verificadores
+    let length = cnpj.length - 2
+    let numbers = cnpj.substring(0, length)
+    const digits = cnpj.substring(length)
+    let sum = 0
+    let pos = length - 7
+
+    for (let i = length; i >= 1; i--) {
+      sum += parseInt(numbers.charAt(length - i)) * pos--
+      if (pos < 2) pos = 9
+    }
+
+    let result = sum % 11 < 2 ? 0 : 11 - (sum % 11)
+    if (result !== parseInt(digits.charAt(0))) return false
+
+    length = length + 1
+    numbers = cnpj.substring(0, length)
+    sum = 0
+    pos = length - 7
+
+    for (let i = length; i >= 1; i--) {
+      sum += parseInt(numbers.charAt(length - i)) * pos--
+      if (pos < 2) pos = 9
+    }
+
+    result = sum % 11 < 2 ? 0 : 11 - (sum % 11)
+
+    return result === parseInt(digits.charAt(1))
+  }
+
+  /**
+   * Formata CNPJ para exibição (XX.XXX.XXX/XXXX-XX)
+   */
+  private formatCNPJDisplay(cnpj: string): string {
+    const clean = cnpj.replace(/\D/g, '')
+    return clean.replace(
+      /^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,
+      '$1.$2.$3/$4-$5'
+    )
   }
 
   /**
@@ -212,7 +469,7 @@ export class CNPJFinderService {
 
         // Se não encontrou match exato, pegar o primeiro resultado
         if (data[0].tax_id) {
-          console.log(`⚠️  Match aproximado: "${data[0].name}"`)
+          console.log(`  Match aproximado: "${data[0].name}"`)
           return this.formatCNPJ(data[0].tax_id)
         }
       }
@@ -256,7 +513,7 @@ export class CNPJFinderService {
         if (response.ok) {
           const data = await response.json()
           if (Array.isArray(data) && data.length > 0 && data[0].tax_id) {
-            console.log(`✅ Encontrado com variação: "${variation}"`)
+            console.log(` Encontrado com variação: "${variation}"`)
             return this.formatCNPJ(data[0].tax_id)
           }
         }

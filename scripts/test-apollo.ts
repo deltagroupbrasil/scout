@@ -1,4 +1,5 @@
 // Teste da integração Apollo.io
+import 'dotenv/config'
 import { apolloEnrichment } from '../lib/services/apollo-enrichment'
 
 async function testApollo() {

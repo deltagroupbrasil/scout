@@ -21,7 +21,7 @@ export class LinkedInCompanyScraperService {
   constructor() {
     this.browserWSEndpoint = process.env.BRIGHT_DATA_PUPPETEER_URL || null
     if (!this.browserWSEndpoint) {
-      console.warn('⚠️ BRIGHT_DATA_PUPPETEER_URL não configurada - LinkedIn scraping desabilitado')
+      console.warn(' BRIGHT_DATA_PUPPETEER_URL não configurada - LinkedIn scraping desabilitado')
     }
   }
 
@@ -30,7 +30,7 @@ export class LinkedInCompanyScraperService {
    */
   async scrapeCompanyPage(linkedinUrl: string): Promise<LinkedInCompanyData> {
     if (!this.browserWSEndpoint) {
-      console.log('❌ [LinkedIn Company] Bright Data não configurado')
+      console.log(' [LinkedIn Company] Bright Data não configurado')
       return this.emptyResult()
     }
 
@@ -39,7 +39,7 @@ export class LinkedInCompanyScraperService {
       ? linkedinUrl
       : `https://www.linkedin.com${linkedinUrl.startsWith('/') ? '' : '/'}${linkedinUrl}`
 
-    console.log(`🔍 [LinkedIn Company] Scraping: ${companyUrl}`)
+    console.log(` [LinkedIn Company] Scraping: ${companyUrl}`)
 
     let browser = null
     try {
@@ -80,7 +80,7 @@ export class LinkedInCompanyScraperService {
         data.employeesCount = this.parseEmployeeCount(data.employees)
       }
 
-      console.log(`✅ [LinkedIn Company] Dados extraídos:`)
+      console.log(` [LinkedIn Company] Dados extraídos:`)
       console.log(`   Website: ${data.website || 'N/A'}`)
       console.log(`   Seguidores: ${data.followers?.toLocaleString() || 'N/A'}`)
       console.log(`   Funcionários: ${data.employees || 'N/A'}`)

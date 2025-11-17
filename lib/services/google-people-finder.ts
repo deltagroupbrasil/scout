@@ -1,7 +1,6 @@
 // Google People Finder - Busca pessoas REAIS via Google Search
 // Usa Bright Data SERP API + Web Unlocker para encontrar decisores
 import * as cheerio from 'cheerio'
-import { apolloEnrichment } from './apollo-enrichment'
 
 export interface RealPerson {
   name: string
@@ -37,7 +36,7 @@ export class GooglePeopleFinderService {
     companyWebsite: string,
     roles: string[]
   ): Promise<RealPerson[]> {
-    console.log(`\n🔍 [Google People Finder] Buscando decisores reais de ${companyName}`)
+    console.log(`\n [Google People Finder] Buscando decisores reais de ${companyName}`)
 
     const allPeople: RealPerson[] = []
 
@@ -57,15 +56,18 @@ export class GooglePeopleFinderService {
     allPeople.push(...directoryPeople)
 
     // Estratégia 4: Apollo.io (emails e telefones verificados)
-    console.log(`\n📍 Estratégia 4: Apollo.io`)
+    // NOTA: Apollo.io foi removido do projeto
+    console.log(`\n📍 Estratégia 4: Apollo.io (desativado)`)
     try {
+      // Apollo integration removed - uncomment if re-added
+      /*
       const apolloContacts = await apolloEnrichment.findFinancialDecisionMakers(
         companyName,
         this.extractDomain(companyWebsite)
       )
 
       if (apolloContacts.length > 0) {
-        console.log(`   ✅ Apollo encontrou ${apolloContacts.length} decisores`)
+        console.log(`    Apollo encontrou ${apolloContacts.length} decisores`)
 
         // Converter para formato RealPerson
         const apolloPeople: RealPerson[] = apolloContacts.map(contact => ({
@@ -80,16 +82,17 @@ export class GooglePeopleFinderService {
 
         allPeople.push(...apolloPeople)
       } else {
-        console.log(`   ⚠️  Apollo não encontrou decisores`)
+        console.log(`     Apollo não encontrou decisores`)
       }
+      */
     } catch (error) {
-      console.error(`   ❌ Erro ao buscar no Apollo:`, error)
+      console.error(`    Erro ao buscar no Apollo:`, error)
     }
 
     // Remover duplicatas (mesmo nome ou mesmo email)
     const uniquePeople = this.deduplicatePeople(allPeople)
 
-    console.log(`\n✅ Total de pessoas reais encontradas: ${uniquePeople.length}`)
+    console.log(`\n Total de pessoas reais encontradas: ${uniquePeople.length}`)
 
     return uniquePeople
   }
@@ -103,7 +106,7 @@ export class GooglePeopleFinderService {
     roles: string[]
   ): Promise<RealPerson[]> {
     if (!this.webUnlockerUrl) {
-      console.warn('   ⚠️  Bright Data Web Unlocker não configurado')
+      console.warn('     Bright Data Web Unlocker não configurado')
       return []
     }
 
@@ -115,7 +118,7 @@ export class GooglePeopleFinderService {
         const query = `${role} ${companyName} email contact`
         const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&hl=pt-BR`
 
-        console.log(`   🔍 Google: "${query}"`)
+        console.log(`    Google: "${query}"`)
 
         const response = await fetch(this.webUnlockerUrl, {
           method: 'POST',
@@ -131,7 +134,7 @@ export class GooglePeopleFinderService {
         })
 
         if (!response.ok) {
-          console.warn(`   ⚠️  Web Unlocker error: ${response.status}`)
+          console.warn(`     Web Unlocker error: ${response.status}`)
           continue
         }
 
@@ -142,13 +145,13 @@ export class GooglePeopleFinderService {
         const extractedPeople = this.extractPeopleFromGoogleHTML($, role)
         people.push(...extractedPeople)
 
-        console.log(`   ✅ Encontradas ${extractedPeople.length} pessoas para ${role}`)
+        console.log(`    Encontradas ${extractedPeople.length} pessoas para ${role}`)
 
         // Rate limit
         await this.sleep(2000)
 
       } catch (error) {
-        console.error(`   ❌ Erro ao buscar ${role}:`, error)
+        console.error(`    Erro ao buscar ${role}:`, error)
       }
     }
 
@@ -208,10 +211,10 @@ export class GooglePeopleFinderService {
               confidence: emailMatch ? 'high' : 'medium',
             })
 
-            console.log(`      ✅ Encontrado: ${nameMatch} ${emailMatch ? `(${emailMatch[0]})` : ''}`)
+            console.log(`       Encontrado: ${nameMatch} ${emailMatch ? `(${emailMatch[0]})` : ''}`)
           }
         } catch (error) {
-          console.error('   ⚠️  Erro ao extrair pessoa:', error)
+          console.error('     Erro ao extrair pessoa:', error)
         }
       })
 
@@ -263,7 +266,7 @@ export class GooglePeopleFinderService {
           })
         }
       } catch (error) {
-        console.error('   ⚠️  Erro ao extrair pessoa:', error)
+        console.error('     Erro ao extrair pessoa:', error)
       }
     }
 
@@ -275,7 +278,7 @@ export class GooglePeopleFinderService {
    */
   private async scrapeCompanyWebsite(websiteUrl: string): Promise<RealPerson[]> {
     if (!this.webUnlockerUrl || !websiteUrl) {
-      console.warn('   ⚠️  Web Unlocker não configurado ou sem website')
+      console.warn('     Web Unlocker não configurado ou sem website')
       return []
     }
 
@@ -287,7 +290,7 @@ export class GooglePeopleFinderService {
 
       for (const pageUrl of teamPageUrls) {
         try {
-          console.log(`   🌐 Scraping: ${pageUrl}`)
+          console.log(`    Scraping: ${pageUrl}`)
 
           // Usar Web Unlocker da Bright Data
           const response = await fetch(this.webUnlockerUrl, {
@@ -304,7 +307,7 @@ export class GooglePeopleFinderService {
           })
 
           if (!response.ok) {
-            console.warn(`   ⚠️  Web Unlocker error: ${response.status}`)
+            console.warn(`     Web Unlocker error: ${response.status}`)
             continue
           }
 
@@ -315,18 +318,18 @@ export class GooglePeopleFinderService {
           const extractedPeople = this.extractPeopleFromTeamPage($, pageUrl)
           people.push(...extractedPeople)
 
-          console.log(`   ✅ Encontradas ${extractedPeople.length} pessoas em ${pageUrl}`)
+          console.log(`    Encontradas ${extractedPeople.length} pessoas em ${pageUrl}`)
 
           // Rate limit
           await this.sleep(2000)
 
         } catch (error) {
-          console.error(`   ❌ Erro ao scraping ${pageUrl}:`, error)
+          console.error(`    Erro ao scraping ${pageUrl}:`, error)
         }
       }
 
     } catch (error) {
-      console.error('   ❌ Erro geral ao scraping website:', error)
+      console.error('    Erro geral ao scraping website:', error)
     }
 
     return people
@@ -407,7 +410,7 @@ export class GooglePeopleFinderService {
             })
           }
         } catch (error) {
-          console.error('   ⚠️  Erro ao extrair membro:', error)
+          console.error('     Erro ao extrair membro:', error)
         }
       })
 
@@ -442,7 +445,7 @@ export class GooglePeopleFinderService {
     companyWebsite: string
   ): Promise<RealPerson[]> {
     if (!this.webUnlockerUrl) {
-      console.warn('   ⚠️  Web Unlocker não configurado')
+      console.warn('     Web Unlocker não configurado')
       return []
     }
 
@@ -452,7 +455,7 @@ export class GooglePeopleFinderService {
       // Crunchbase - página da empresa
       const crunchbaseUrl = `https://www.crunchbase.com/organization/${this.slugify(companyName)}`
 
-      console.log(`   🔍 Buscando em Crunchbase...`)
+      console.log(`    Buscando em Crunchbase...`)
 
       const response = await fetch(this.webUnlockerUrl, {
         method: 'POST',
@@ -490,13 +493,13 @@ export class GooglePeopleFinderService {
           }
         })
 
-        console.log(`   ✅ Encontradas ${people.length} pessoas no Crunchbase`)
+        console.log(`    Encontradas ${people.length} pessoas no Crunchbase`)
       }
 
       await this.sleep(2000)
 
     } catch (error) {
-      console.error('   ❌ Erro ao buscar em diretórios:', error)
+      console.error('    Erro ao buscar em diretórios:', error)
     }
 
     return people

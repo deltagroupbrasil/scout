@@ -10,6 +10,18 @@ export interface SuggestedContact {
   linkedin?: string
   email?: string
   phone?: string
+  source?: 'linkedin' | 'google' | 'website' | 'estimated' | 'congonhas_api' // Origem do contato
+}
+
+// ============================================
+// RELATED JOB TYPES
+// ============================================
+export interface RelatedJob {
+  title: string
+  description: string
+  url: string
+  postedDate: Date | string
+  candidateCount?: number | null
 }
 
 // ============================================
@@ -34,9 +46,11 @@ export interface LeadWithCompany {
   jobPostedDate: Date
   jobSource: string
   candidateCount?: number | null
+  relatedJobs?: string | null // JSON string de RelatedJob[]
   suggestedContacts?: SuggestedContact[] | null
   triggers?: string[] | null
   status: LeadStatus
+  priorityScore: number
   isNew: boolean
   createdAt: Date
   updatedAt: Date
@@ -89,14 +103,18 @@ export interface PaginatedResponse<T> {
 // SCRAPING TYPES
 // ============================================
 export interface LinkedInJobData {
-  title: string
-  company: string
+  jobTitle: string
+  companyName: string
   companyUrl?: string
   location: string
   description: string
+  jobDescription?: string
   postedDate: Date
+  jobPostedDate?: Date
   jobUrl: string
   candidateCount?: number
+  applicants?: number
+  jobSource?: string
 }
 
 export interface CompanyEnrichmentData {

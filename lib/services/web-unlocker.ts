@@ -29,7 +29,7 @@ export class WebUnlockerService {
     }
 
     try {
-      console.log(`🔓 Acessando via Web Unlocker: ${url}`)
+      console.log(` Acessando via Web Unlocker: ${url}`)
 
       const response = await fetch(this.apiUrl, {
         method: 'POST',
@@ -49,16 +49,24 @@ export class WebUnlockerService {
         throw new Error(`Web Unlocker error: ${response.status}\n${errorText}`)
       }
 
-      const data = await response.json()
+      // Verificar o tipo de conteúdo da resposta
+      const contentType = response.headers.get('content-type') || ''
+      let html = ''
 
-      // A resposta vem com estrutura: { status_code, headers, body }
-      const html = data.body || ''
+      if (contentType.includes('application/json')) {
+        // Se for JSON, parsear e pegar o body
+        const data = await response.json()
+        html = data.body || data
+      } else {
+        // Se for HTML direto, usar como está
+        html = await response.text()
+      }
 
-      console.log(`✅ Página carregada: ${html.length} caracteres`)
+      console.log(` Página carregada: ${html.length} caracteres`)
 
       return html
     } catch (error) {
-      console.error('❌ Erro no Web Unlocker:', error)
+      console.error(' Erro no Web Unlocker:', error)
       throw error
     }
   }
@@ -103,11 +111,11 @@ export class WebUnlockerService {
         }
       })
 
-      console.log(`📊 Gupy: ${jobs.length} vagas encontradas`)
+      console.log(` Gupy: ${jobs.length} vagas encontradas`)
 
       return jobs
     } catch (error) {
-      console.error('❌ Erro ao buscar vagas no Gupy:', error)
+      console.error(' Erro ao buscar vagas no Gupy:', error)
       return []
     }
   }
@@ -152,11 +160,11 @@ export class WebUnlockerService {
         }
       })
 
-      console.log(`📊 Catho: ${jobs.length} vagas encontradas`)
+      console.log(` Catho: ${jobs.length} vagas encontradas`)
 
       return jobs
     } catch (error) {
-      console.error('❌ Erro ao buscar vagas no Catho:', error)
+      console.error(' Erro ao buscar vagas no Catho:', error)
       return []
     }
   }
@@ -201,11 +209,11 @@ export class WebUnlockerService {
         }
       })
 
-      console.log(`📊 InfoJobs: ${jobs.length} vagas encontradas`)
+      console.log(` InfoJobs: ${jobs.length} vagas encontradas`)
 
       return jobs
     } catch (error) {
-      console.error('❌ Erro ao buscar vagas no InfoJobs:', error)
+      console.error(' Erro ao buscar vagas no InfoJobs:', error)
       return []
     }
   }
@@ -217,7 +225,7 @@ export class WebUnlockerService {
     query: string,
     location: string = 'São Paulo'
   ): Promise<LinkedInJobData[]> {
-    console.log('🔍 Buscando vagas em plataformas brasileiras...')
+    console.log(' Buscando vagas em plataformas brasileiras...')
 
     const promises = [
       this.scrapeGupyJobs(query),
@@ -237,7 +245,7 @@ export class WebUnlockerService {
       }
     })
 
-    console.log(`📊 Total de vagas encontradas: ${allJobs.length}`)
+    console.log(` Total de vagas encontradas: ${allJobs.length}`)
 
     return allJobs
   }

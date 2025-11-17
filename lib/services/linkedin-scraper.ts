@@ -53,13 +53,13 @@ export class LinkedInScraperService {
     let page: Page | null = null
 
     try {
-      console.log('🔍 Conectando ao navegador Bright Data...')
+      console.log(' Conectando ao navegador Bright Data...')
       browser = await this.connectBrowser()
       page = await browser.newPage()
 
       // Construir URL de busca do LinkedIn
       const searchUrl = this.buildLinkedInSearchUrl(query, location, daysAgo)
-      console.log('🌐 Navegando para:', searchUrl)
+      console.log(' Navegando para:', searchUrl)
 
       await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 60000 })
 
@@ -72,10 +72,10 @@ export class LinkedInScraperService {
           page.waitForSelector('[data-job-id]', { timeout: 30000 })
         ])
       } catch (error) {
-        console.warn('⚠️ Timeout aguardando lista de vagas, tentando extrair mesmo assim...')
+        console.warn(' Timeout aguardando lista de vagas, tentando extrair mesmo assim...')
       }
 
-      console.log('📊 Extraindo vagas da página...')
+      console.log(' Extraindo vagas da página...')
 
       // Extrair dados das vagas
       const jobs = await page.evaluate(() => {
@@ -92,21 +92,21 @@ export class LinkedInScraperService {
         for (const selector of possibleSelectors) {
           jobCards = document.querySelectorAll(selector)
           if (jobCards.length > 0) {
-            console.log(`✅ Usando seletor: ${selector} (${jobCards.length} cards encontrados)`)
+            console.log(` Usando seletor: ${selector} (${jobCards.length} cards encontrados)`)
             break
           }
         }
 
         if (!jobCards || jobCards.length === 0) {
-          console.warn('⚠️ Nenhum card de vaga encontrado com seletores tradicionais')
-          console.log('🔄 Tentando fallback: buscar todos os links de vagas...')
+          console.warn(' Nenhum card de vaga encontrado com seletores tradicionais')
+          console.log(' Tentando fallback: buscar todos os links de vagas...')
 
           // Fallback: buscar todos os links que apontam para /jobs/view/
           const jobLinks = document.querySelectorAll('a[href*="/jobs/view/"]')
           console.log(`🔗 Encontrados ${jobLinks.length} links de vagas`)
 
           if (jobLinks.length === 0) {
-            console.error('❌ Nenhuma vaga encontrada mesmo com fallback')
+            console.error(' Nenhuma vaga encontrada mesmo com fallback')
             return []
           }
 
@@ -253,7 +253,7 @@ export class LinkedInScraperService {
         return results
       })
 
-      console.log(`✅ Encontradas ${jobs.length} vagas`)
+      console.log(` Encontradas ${jobs.length} vagas`)
 
       // Converter para formato LinkedInJobData
       const linkedInJobs: LinkedInJobData[] = jobs.map((job) => ({
@@ -263,13 +263,13 @@ export class LinkedInScraperService {
         description: '', // Será preenchido em getJobDetails se necessário
         postedDate: job.postedDate,
         jobUrl: job.jobUrl,
-        applicants: 0, // Não disponível na listagem
-        cnpj: null, // Será extraído posteriormente
+        candidateCount: 0, // Não disponível na listagem
+        jobSource: 'LinkedIn',
       }))
 
       return linkedInJobs
     } catch (error) {
-      console.error('❌ Erro ao buscar vagas no LinkedIn:', error)
+      console.error(' Erro ao buscar vagas no LinkedIn:', error)
       throw error
     } finally {
       // Fechar navegador
@@ -293,7 +293,7 @@ export class LinkedInScraperService {
     let page: Page | null = null
 
     try {
-      console.log('🔍 Extraindo detalhes da vaga:', jobUrl)
+      console.log(' Extraindo detalhes da vaga:', jobUrl)
       browser = await this.connectBrowser()
       page = await browser.newPage()
 
@@ -312,25 +312,25 @@ export class LinkedInScraperService {
         // Tentar extrair número de candidatos
         const applicantsText = document.querySelector('.num-applicants__caption')?.textContent?.trim() || ''
         const applicantsMatch = applicantsText.match(/(\d+)/)
-        const applicants = applicantsMatch ? parseInt(applicantsMatch[1]) : 0
+        const candidateCount = applicantsMatch ? parseInt(applicantsMatch[1]) : 0
 
         return {
           jobTitle: title,
           companyName: company,
           location,
           description,
-          applicants,
+          candidateCount,
         }
       })
 
       return {
         ...jobDetails,
         jobUrl,
-        postedDate: new Date().toISOString(),
-        cnpj: null,
+        postedDate: new Date(),
+        jobSource: 'LinkedIn',
       }
     } catch (error) {
-      console.error('❌ Erro ao extrair detalhes da vaga:', error)
+      console.error(' Erro ao extrair detalhes da vaga:', error)
       return null
     } finally {
       if (page) await page.close()

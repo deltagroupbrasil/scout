@@ -45,7 +45,7 @@ export class AICompanyEnrichmentService {
         apiKey,
       })
     } else {
-      console.warn('⚠️ CLAUDE_API_KEY não configurada - AI enrichment desabilitado')
+      console.warn(' CLAUDE_API_KEY não configurada - AI enrichment desabilitado')
     }
   }
 
@@ -62,7 +62,7 @@ export class AICompanyEnrichmentService {
     }
 
     try {
-      console.log(`🔍 [AI Enrichment] Buscando dados sobre ${companyName}`)
+      console.log(` [AI Enrichment] Buscando dados sobre ${companyName}`)
 
       const prompt = this.buildEnrichmentPrompt(companyName, companySector, companyWebsite)
 

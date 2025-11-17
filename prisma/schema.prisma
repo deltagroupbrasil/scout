@@ -7,7 +7,7 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
+  url      = env("DATABASE_URL")
 }
 
 // ============================================
@@ -21,7 +21,14 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  notes     Note[]
+  // 2FA (Two-Factor Authentication)
+  twoFactorEnabled Boolean  @default(false)
+  twoFactorSecret  String?  // TOTP secret (encrypted)
+  backupCodes      Json?    // Array de códigos de backup (encrypted)
+
+  notes            Note[]
+  contactFeedbacks ContactFeedback[]
+  assignedLeads    Lead[]
 
   @@map("users")
 }
@@ -37,20 +44,45 @@ model Company {
   employees   Int?      // Número de funcionários
   sector      String?   // Setor de atuação
   location    String?   // Endereço completo
-  website     String?
-  linkedinUrl String?
+  // Website & Social Media
+  website              String?
+  websiteSource        String?   // claude_ai, google_search, email_domain, manual
+  websiteConfidence    String?   // high, medium, low
+  websiteVerifiedAt    DateTime? // Última verificação do website
+  linkedinUrl          String?
+  linkedinFollowers    String?   // Seguidores no LinkedIn
+  instagramUrl         String?   // URL completa do Instagram
+  instagramHandle      String?   // @usuario do Instagram
+  instagramFollowers   String?   // Seguidores estimados
+  instagramVerified    Boolean   @default(false) // Verificado via scraping
+  twitterUrl           String?   // URL completa do Twitter/X
+  twitterHandle        String?   // @usuario do Twitter/X
+  twitterVerified      Boolean   @default(false) // Verificado via scraping
+  facebookUrl          String?   // URL completa do Facebook
+  facebookHandle       String?   // Handle do Facebook
+  facebookVerified     Boolean   @default(false) // Verificado via scraping
+  youtubeUrl           String?   // URL completa do YouTube
+  youtubeHandle        String?   // Handle do YouTube
+  youtubeVerified      Boolean   @default(false) // Verificado via scraping
+  socialMediaSource    String?   // website_scraping, ai_search, google_search, pattern_guess
+  socialMediaUpdatedAt DateTime? // Última atualização das redes sociais
 
   // AI Enrichment Data
   estimatedRevenue    String?  // Faixa estimada via IA (ex: "R$ 50M - R$ 100M")
   estimatedEmployees  String?  // Faixa estimada via IA (ex: "200-500")
-  recentNews          String?  // JSON: Array de notícias recentes
-  upcomingEvents      String?  // JSON: Array de eventos futuros
-  instagramHandle     String?  // @usuario do Instagram
-  instagramFollowers  String?  // Seguidores estimados
-  linkedinFollowers   String?  // Seguidores no LinkedIn
+  recentNews          Json?    // Array de notícias recentes
+  upcomingEvents      Json?    // Array de eventos futuros
+  eventsDetectedAt    DateTime? // Última vez que eventos foram detectados
   industryPosition    String?  // Posição no mercado (líder, challenger, etc)
-  keyInsights         String?  // JSON: Array de insights chave
+  keyInsights         Json?    // Array de insights chave
   enrichedAt          DateTime? // Última vez que foi enriquecida com IA
+
+  // Contact Enrichment Data (Nova Vida TI)
+  companyPhones       Json?    // Array de telefones da empresa
+  companyEmails       Json?    // Array de emails corporativos
+  companyWhatsApp     String?  // WhatsApp da empresa
+  partners            Json?    // Array de sócios {nome, qualificacao, telefones, emails, linkedin}
+  partnersLastUpdate  DateTime? // Última atualização dos dados de sócios
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -68,7 +100,7 @@ model Lead {
   companyId       String
   company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  // Informações da Vaga
+  // Informações da Vaga Principal
   jobTitle        String
   jobDescription  String
   jobUrl          String
@@ -76,24 +108,34 @@ model Lead {
   jobSource       String   @default("LinkedIn")
   candidateCount  Int?     // Número de candidatos (quando disponível)
 
+  // Vagas Adicionais da Mesma Empresa (JSON)
+  relatedJobs     Json?  // Array de {title, description, url, postedDate, candidateCount}
+
   // Inteligência (IA Generated)
-  suggestedContacts String?  // JSON serializado: Array de {name, role, linkedin, email, phone}
-  triggers          String?  // JSON serializado: Array de strings com gatilhos de abordagem
+  suggestedContacts Json?  // Array de {name, role, linkedin, email, phone, source}
+  triggers          Json?  // Array de strings com gatilhos de abordagem
 
   // CRM Status
   status          LeadStatus @default(NEW)
   priorityScore   Int        @default(0)     // Score de prioridade (0-100)
+
+  // Atribuição (Assignment)
+  assignedToId    String?   // ID do usuário responsável pelo lead
+  assignedTo      User?     @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedAt      DateTime? // Data de atribuição
 
   // Metadata
   isNew           Boolean    @default(true)  // Flag para leads < 48h
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
-  notes           Note[]
+  notes            Note[]
+  contactFeedbacks ContactFeedback[]
 
   @@index([status])
   @@index([createdAt])
   @@index([companyId])
+  @@index([assignedToId])
   @@map("leads")
 }
 
@@ -123,7 +165,7 @@ model ScrapeLog {
   query         String   // Query usada na busca
   jobsFound     Int      @default(0)
   leadsCreated  Int      @default(0)
-  errors        String?  // Erros encontrados (JSON)
+  errors        Json?  // Erros encontrados
   duration      Int?     // Duração em segundos
   createdAt     DateTime @default(now())
 
@@ -156,6 +198,51 @@ model EnrichmentCache {
   @@index([cnpj])
   @@index([expiresAt])
   @@map("enrichment_cache")
+}
+
+// ============================================
+// NOVA VIDA TI USAGE MODEL
+// ============================================
+model NovaVidaTIUsage {
+  id          String   @id @default(uuid())
+  companyName String   // Nome da empresa consultada
+  cnpj        String   // CNPJ consultado
+  cost        Float    @default(0.06) // Custo da consulta (R$ 0.06)
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([cnpj])
+  @@map("nova_vida_ti_usage")
+}
+
+// ============================================
+// CONTACT FEEDBACK MODEL
+// ============================================
+model ContactFeedback {
+  id           String   @id @default(uuid())
+  leadId       String
+  lead         Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+
+  // Dados do contato avaliado
+  contactName  String
+  contactRole  String
+  contactEmail String?
+  contactPhone String?
+  contactSource String?  // apollo, linkedin, google, website, estimated
+
+  // Feedback
+  isCorrect    Boolean  // true = ✅ correto, false = ❌ incorreto
+  comment      String?  // Comentário opcional do usuário
+
+  createdAt    DateTime @default(now())
+
+  @@index([leadId])
+  @@index([userId])
+  @@index([contactSource])
+  @@index([isCorrect])
+  @@map("contact_feedback")
 }
 
 // ============================================

@@ -49,7 +49,7 @@ export class AIInsightsService {
       const insights = this.parseInsightsFromResponse(responseText)
 
       if (insights) {
-        console.log('✅ Insights gerados com IA para:', companyName)
+        console.log(' Insights gerados com IA para:', companyName)
         return insights
       }
 

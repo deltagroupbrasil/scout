@@ -134,6 +134,40 @@ export class PriorityScoreService {
   }
 
   /**
+   * Calcula score baseado em valores individuais (usado durante criação de lead)
+   */
+  calculate(params: {
+    revenue: number | null
+    employees: number | null
+    jobPostedDate: Date
+    candidateCount?: number | null
+    triggers: number  // Número de triggers, não a string JSON
+  }): number {
+    let score = 0
+
+    // 1. Faturamento da empresa (0-35 pontos)
+    score += this.scoreRevenue(params.revenue)
+
+    // 2. Número de funcionários (0-25 pontos)
+    score += this.scoreEmployees(params.employees)
+
+    // 3. Recenticidade da vaga (0-20 pontos)
+    score += this.scoreRecency(params.jobPostedDate)
+
+    // 4. Número de candidatos (0-10 pontos)
+    score += this.scoreCandidates(params.candidateCount || null)
+
+    // 5. Presença de triggers de IA (0-10 pontos)
+    // Aqui recebemos o número de triggers, não a string JSON
+    const triggerCount = params.triggers
+    if (triggerCount >= 3) score += 10
+    else if (triggerCount >= 2) score += 7
+    else if (triggerCount >= 1) score += 5
+
+    return Math.min(Math.round(score), 100)
+  }
+
+  /**
    * Retorna label descritivo do score
    */
   getScoreLabel(score: number): string {

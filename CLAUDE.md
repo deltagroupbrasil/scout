@@ -52,10 +52,15 @@ npx tsx scripts/test-bright-data-full-enrichment.ts # Test complete enrichment p
 
 ### API Testing
 ```bash
-# Test manual scraping
+# Test manual scraping (default: 20 companies)
 curl -X POST http://localhost:3000/api/scrape \
   -H "Content-Type: application/json" \
   -d '{"query": "Controller São Paulo"}'
+
+# Test manual scraping with custom limit
+curl -X POST http://localhost:3000/api/scrape \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Controller São Paulo", "maxCompanies": 10}'
 
 # Test cron job (requires CRON_SECRET in dev)
 curl http://localhost:3000/api/cron/scrape-leads
@@ -169,12 +174,31 @@ HUNTER_IO_API_KEY="your-hunter-key"         # Email finder
 
 ### AI Insights Generation
 
-The Claude API integration (`lib/services/ai-insights.ts`) uses a carefully crafted prompt to generate Brazilian-realistic contact names and contextual triggers.
+The Claude API integration uses carefully crafted prompts for two different purposes:
 
-**Model**: `claude-3-5-haiku-20241022` (cheaper, works well)
-**Fallback**: If API fails, returns generic insights based on job title pattern matching.
+#### 1. Company Enrichment (`lib/services/ai-company-enrichment.ts`)
+**Model**: `claude-sonnet-4-5-20250929` (production - best accuracy)
+**Purpose**: Find REAL company data (revenue, employees, CNPJ, news, social media)
+**Success Rate**: 100% revenue detection, 100% employees detection
+**Cost**: ~$0.015 per company enrichment
+**Key Features**:
+- Web search with multiple source priorities
+- Finds revenue in 6+ different sources (site oficial, notícias, CVM, etc)
+- Returns structured JSON with verified data
+- Includes news with real URLs and dates
 
-The AI response is parsed as JSON. If parsing fails, falls back to defaults. Always test with `scripts/test-ai-insights.ts` after modifying the prompt.
+#### 2. Lead Insights (`lib/services/ai-insights.ts`)
+**Model**: `claude-3-5-haiku-20241022` (faster, cheaper)
+**Purpose**: Generate approach triggers and contact suggestions
+**Fallback**: If API fails, returns generic insights based on job title pattern matching
+
+**Testing**:
+```bash
+npx tsx scripts/test-pagbank-enrichment.ts  # Test company enrichment
+npx tsx scripts/test-ai-insights.ts          # Test lead insights
+```
+
+**Important**: The AI response is parsed as JSON. If parsing fails, falls back to defaults.
 
 ### CNPJ Finder & Company Enrichment
 
@@ -297,6 +321,8 @@ Automated scraping configured in `vercel.json`:
 ```
 
 In development, call the endpoint manually. In production on Vercel, it runs automatically at 6am daily. The endpoint checks `Authorization: Bearer ${CRON_SECRET}` header (skipped in dev).
+
+**Company Limit**: Scraping is limited to 20 unique companies per execution (configurable via `maxCompanies` parameter in `scrapeAndProcessLeads()`). This prevents overwhelming the system with too many leads at once and ensures focused, high-quality processing. The limit applies to unique companies, not total jobs - if a company has 5 job openings, all 5 will be processed but only count as 1 company toward the limit.
 
 ### CNPJ Enrichment
 

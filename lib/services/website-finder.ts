@@ -16,7 +16,7 @@ export class WebsiteFinderService {
   constructor() {
     const apiKey = process.env.CLAUDE_API_KEY
     if (!apiKey) {
-      console.warn('⚠️ CLAUDE_API_KEY não configurada - Website finder limitado')
+      console.warn(' CLAUDE_API_KEY não configurada - Website finder limitado')
     }
     this.claude = new Anthropic({ apiKey: apiKey || 'dummy' })
   }
@@ -29,12 +29,12 @@ export class WebsiteFinderService {
     linkedinUrl?: string,
     cnpjWebsite?: string
   ): Promise<WebsiteFinderResult> {
-    console.log(`🔍 [Website Finder] Buscando website para: ${companyName}`)
+    console.log(` [Website Finder] Buscando website para: ${companyName}`)
 
     // Estratégia 1: Se já tem website do CNPJ, validar
     if (cnpjWebsite && this.isValidWebsite(cnpjWebsite)) {
       const domain = this.extractDomain(cnpjWebsite)
-      console.log(`✅ [CNPJ] Website encontrado: ${cnpjWebsite}`)
+      console.log(` [CNPJ] Website encontrado: ${cnpjWebsite}`)
       return {
         website: this.normalizeWebsite(cnpjWebsite),
         domain,
@@ -47,7 +47,7 @@ export class WebsiteFinderService {
     if (linkedinUrl) {
       const fromLinkedIn = this.extractWebsiteFromLinkedInUrl(linkedinUrl)
       if (fromLinkedIn) {
-        console.log(`✅ [LinkedIn URL] Website inferido: ${fromLinkedIn}`)
+        console.log(` [LinkedIn URL] Website inferido: ${fromLinkedIn}`)
         return {
           website: fromLinkedIn,
           domain: this.extractDomain(fromLinkedIn),
@@ -61,7 +61,7 @@ export class WebsiteFinderService {
     try {
       const aiWebsite = await this.searchWithAI(companyName)
       if (aiWebsite && this.isValidWebsite(aiWebsite)) {
-        console.log(`✅ [AI Search] Website encontrado: ${aiWebsite}`)
+        console.log(` [AI Search] Website encontrado: ${aiWebsite}`)
         return {
           website: this.normalizeWebsite(aiWebsite),
           domain: this.extractDomain(aiWebsite),
@@ -70,12 +70,12 @@ export class WebsiteFinderService {
         }
       }
     } catch (error) {
-      console.error(`❌ [AI Search] Erro:`, error)
+      console.error(` [AI Search] Erro:`, error)
     }
 
     // Estratégia 4: Guess pattern (última tentativa)
     const guessedWebsite = this.guessWebsitePattern(companyName)
-    console.log(`⚠️ [Pattern Guess] Tentativa: ${guessedWebsite}`)
+    console.log(` [Pattern Guess] Tentativa: ${guessedWebsite}`)
     return {
       website: guessedWebsite,
       domain: this.extractDomain(guessedWebsite),

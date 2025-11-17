@@ -8,9 +8,10 @@ export class CompanyEnrichmentService {
    * Usa cache para evitar requisições duplicadas
    */
   async getCompanyByCNPJ(cnpj: string): Promise<CompanyEnrichmentData | null> {
+    // Remover caracteres não numéricos do CNPJ
+    const cleanCNPJ = cnpj.replace(/\D/g, '')
+
     try {
-      // Remover caracteres não numéricos do CNPJ
-      const cleanCNPJ = cnpj.replace(/\D/g, '')
 
       // 1. Verificar cache primeiro
       const cached = await this.getFromCache(cleanCNPJ)
@@ -26,7 +27,7 @@ export class CompanyEnrichmentService {
 
       if (!response.ok) {
         if (response.status === 403 || response.status === 429) {
-          console.warn(`⚠️  [Enrichment] Rate limit atingido (${response.status}), usando apenas CNPJ`)
+          console.warn(`  [Enrichment] Rate limit atingido (${response.status}), usando apenas CNPJ`)
           // Retornar apenas o CNPJ sem enriquecimento
           return {
             cnpj: cleanCNPJ,
@@ -41,7 +42,7 @@ export class CompanyEnrichmentService {
 
       const data = await response.json()
 
-      console.log(`✅ [Enrichment] Dados enriquecidos: ${data.nome_fantasia || data.razao_social}`)
+      console.log(` [Enrichment] Dados enriquecidos: ${data.nome_fantasia || data.razao_social}`)
 
       const enrichmentData = {
         cnpj: data.cnpj,
@@ -56,7 +57,7 @@ export class CompanyEnrichmentService {
 
       return enrichmentData
     } catch (error) {
-      console.error('❌ [Enrichment] Erro ao buscar dados da Receita Federal:', error)
+      console.error(' [Enrichment] Erro ao buscar dados da Receita Federal:', error)
 
       // Salvar erro no cache para não tentar novamente (expira em 1 dia)
       await this.saveErrorToCache(cleanCNPJ, error instanceof Error ? error.message : 'Unknown error')

@@ -58,7 +58,7 @@ export class SerpApiService {
       // Adicionar filtros para melhorar resultados
       searchQuery = `${searchQuery} "vaga" OR "oportunidade" -"curso" -"estágio"`
 
-      console.log(`🔍 Buscando no Google: "${searchQuery}"`)
+      console.log(` Buscando no Google: "${searchQuery}"`)
 
       const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}&num=${maxResults}`
 
@@ -89,7 +89,7 @@ export class SerpApiService {
       } else {
         // Se não for JSON, tentar parsear HTML
         const html = await response.text()
-        console.log('⚠️  Resposta não é JSON, recebido HTML')
+        console.log('  Resposta não é JSON, recebido HTML')
         console.log('Primeiros 500 caracteres:', html.substring(0, 500))
         return []
       }
@@ -97,21 +97,21 @@ export class SerpApiService {
       // A resposta da Bright Data vem com estrutura: { status_code, headers, body }
       const bodyContent = data.body || data
 
-      console.log('🔍 Debug - Tipo de body:', typeof bodyContent)
+      console.log(' Debug - Tipo de body:', typeof bodyContent)
 
       // Se body for string HTML, precisamos parsear
       let parsedData: SerpApiResponse = {}
 
       if (typeof bodyContent === 'string') {
         // Body é HTML, vamos usar Web Unlocker ou retornar vazio por enquanto
-        console.log('⚠️  SERP API retornou HTML puro. Use Web Unlocker para parsing.')
+        console.log('  SERP API retornou HTML puro. Use Web Unlocker para parsing.')
         return []
       } else {
         parsedData = bodyContent
       }
 
       const results = parsedData.organic_results || []
-      console.log(`✅ Encontrados ${results.length} resultados`)
+      console.log(` Encontrados ${results.length} resultados`)
 
       // Converter resultados para formato LinkedInJobData
       const jobs: LinkedInJobData[] = []
@@ -126,7 +126,7 @@ export class SerpApiService {
 
       return jobs
     } catch (error) {
-      console.error('❌ Erro ao buscar vagas via SERP API:', error)
+      console.error(' Erro ao buscar vagas via SERP API:', error)
       return []
     }
   }
@@ -146,7 +146,7 @@ export class SerpApiService {
       'vagas.com.br',
     ]
 
-    console.log(`🔍 Buscando vagas em ${sources.length} fontes...`)
+    console.log(` Buscando vagas em ${sources.length} fontes...`)
 
     // Buscar em todas as fontes em paralelo
     const promises = sources.map(source => {
@@ -161,17 +161,17 @@ export class SerpApiService {
 
     results.forEach((result, index) => {
       if (result.status === 'fulfilled') {
-        console.log(`✅ ${sources[index]}: ${result.value.length} vagas`)
+        console.log(` ${sources[index]}: ${result.value.length} vagas`)
         allJobs.push(...result.value)
       } else {
-        console.error(`❌ ${sources[index]}: Erro`, result.reason)
+        console.error(` ${sources[index]}: Erro`, result.reason)
       }
     })
 
     // Remover duplicatas por URL
     const uniqueJobs = this.removeDuplicates(allJobs)
 
-    console.log(`📊 Total de vagas únicas: ${uniqueJobs.length}`)
+    console.log(` Total de vagas únicas: ${uniqueJobs.length}`)
 
     return uniqueJobs
   }

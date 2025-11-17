@@ -52,12 +52,12 @@ export class LinkedInPeopleScraperService {
 
     for (const role of roles) {
       try {
-        console.log(`🔍 [LinkedIn People] Buscando: ${role} at ${companyName}`)
+        console.log(` [LinkedIn People] Buscando: ${role} at ${companyName}`)
 
         const query = `${role} at ${companyName}`
         const searchUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(query)}`
 
-        console.log(`🔍 Conectando ao navegador Bright Data...`)
+        console.log(` Conectando ao navegador Bright Data...`)
         const browser = await puppeteer.connect({
           browserWSEndpoint: this.browserWSEndpoint,
         })
@@ -65,7 +65,7 @@ export class LinkedInPeopleScraperService {
         const page = await browser.newPage()
 
         // Navegar para busca de pessoas
-        console.log(`🌐 Navegando para: ${searchUrl}`)
+        console.log(` Navegando para: ${searchUrl}`)
         await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 30000 })
 
         // Aguardar carregamento dos resultados
@@ -82,14 +82,14 @@ export class LinkedInPeopleScraperService {
         // Extrair pessoas dos resultados
         const people = this.extractPeopleFromSearchResults($)
 
-        console.log(`✅ Encontradas ${people.length} pessoas para ${role}`)
+        console.log(` Encontradas ${people.length} pessoas para ${role}`)
         allPeople.push(...people)
 
         // Rate limit
         await this.sleep(2000)
 
       } catch (error) {
-        console.error(`❌ Erro ao buscar ${role}:`, error)
+        console.error(` Erro ao buscar ${role}:`, error)
       }
     }
 
@@ -120,7 +120,7 @@ export class LinkedInPeopleScraperService {
       if ($results.length > 0) break
     }
 
-    console.log(`   📊 Encontrados ${$results.length} resultados no HTML`)
+    console.log(`    Encontrados ${$results.length} resultados no HTML`)
 
     $results.each((_, element) => {
       try {
@@ -155,7 +155,7 @@ export class LinkedInPeopleScraperService {
           })
         }
       } catch (error) {
-        console.error('   ⚠️  Erro ao extrair pessoa:', error)
+        console.error('     Erro ao extrair pessoa:', error)
       }
     })
 
@@ -173,7 +173,7 @@ export class LinkedInPeopleScraperService {
     }
 
     try {
-      console.log(`🔍 [LinkedIn Profile] Scraping: ${linkedinUrl}`)
+      console.log(` [LinkedIn Profile] Scraping: ${linkedinUrl}`)
 
       const browser = await puppeteer.connect({
         browserWSEndpoint: this.browserWSEndpoint,
@@ -225,14 +225,14 @@ export class LinkedInPeopleScraperService {
         experience,
       }
 
-      console.log(`✅ Perfil extraído: ${name}`)
+      console.log(` Perfil extraído: ${name}`)
       if (contactInfo.email) console.log(`   📧 Email: ${contactInfo.email}`)
-      if (contactInfo.phone) console.log(`   📱 Phone: ${contactInfo.phone}`)
+      if (contactInfo.phone) console.log(`    Phone: ${contactInfo.phone}`)
 
       return details
 
     } catch (error) {
-      console.error(`❌ Erro ao scraping profile ${linkedinUrl}:`, error)
+      console.error(` Erro ao scraping profile ${linkedinUrl}:`, error)
       return null
     }
   }

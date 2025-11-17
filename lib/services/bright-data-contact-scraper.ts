@@ -36,7 +36,7 @@ export class BrightDataContactScraperService {
     }
 
     try {
-      console.log(`🔍 [LinkedIn] Scraping perfil: ${linkedinUrl}`)
+      console.log(` [LinkedIn] Scraping perfil: ${linkedinUrl}`)
 
       const browser = await puppeteer.connect({
         browserWSEndpoint: this.browserWSEndpoint,
@@ -92,7 +92,7 @@ export class BrightDataContactScraperService {
 
       await browser.close()
 
-      console.log(`✅ [LinkedIn] Dados extraídos: ${contactInfo.email || 'N/A'} | ${contactInfo.phone || 'N/A'}`)
+      console.log(` [LinkedIn] Dados extraídos: ${contactInfo.email || 'N/A'} | ${contactInfo.phone || 'N/A'}`)
 
       return contactInfo
     } catch (error) {
@@ -110,12 +110,12 @@ export class BrightDataContactScraperService {
     companyDomain: string
   ): Promise<{ emails: string[]; phones: string[] }> {
     try {
-      console.log(`🔍 [Company Scraper] Buscando página de contato: ${companyName}`)
+      console.log(` [Company Scraper] Buscando página de contato: ${companyName}`)
 
       // 1. Encontrar página de contato via Google
       const contactPageUrl = await this.findContactPage(companyName, companyDomain)
       if (!contactPageUrl) {
-        console.log(`⚠️  [Company Scraper] Página de contato não encontrada`)
+        console.log(`  [Company Scraper] Página de contato não encontrada`)
         return { emails: [], phones: [] }
       }
 
@@ -123,7 +123,7 @@ export class BrightDataContactScraperService {
       const contactData = await this.scrapeContactPageContent(contactPageUrl)
 
       console.log(
-        `✅ [Company Scraper] Extraído: ${contactData.emails.length} emails, ${contactData.phones.length} telefones`
+        ` [Company Scraper] Extraído: ${contactData.emails.length} emails, ${contactData.phones.length} telefones`
       )
 
       return contactData
@@ -243,7 +243,7 @@ export class BrightDataContactScraperService {
     companyDomain: string,
     linkedinUrl?: string
   ): Promise<ScrapedContact> {
-    console.log(`🔄 [Bright Data] Enriquecendo: ${name} @ ${companyName}`)
+    console.log(` [Bright Data] Enriquecendo: ${name} @ ${companyName}`)
 
     const contact: ScrapedContact = {
       name,
@@ -261,7 +261,7 @@ export class BrightDataContactScraperService {
         contact.email = linkedinData.email
         contact.phone = linkedinData.phone
         contact.source = 'linkedin_profile'
-        console.log(`✅ [LinkedIn] Email: ${linkedinData.email} | Phone: ${linkedinData.phone}`)
+        console.log(` [LinkedIn] Email: ${linkedinData.email} | Phone: ${linkedinData.phone}`)
         return contact
       }
     }
@@ -284,10 +284,10 @@ export class BrightDataContactScraperService {
     if (!contact.email) {
       contact.email = this.generateEmailByPattern(name, companyDomain)
       contact.source = 'google_search'
-      console.log(`⚠️  [Fallback] Email gerado por padrão: ${contact.email}`)
+      console.log(`  [Fallback] Email gerado por padrão: ${contact.email}`)
     }
 
-    console.log(`✅ [Bright Data] Resultado: ${contact.email} | ${contact.phone || 'N/A'}`)
+    console.log(` [Bright Data] Resultado: ${contact.email} | ${contact.phone || 'N/A'}`)
 
     return contact
   }

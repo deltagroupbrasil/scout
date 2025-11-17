@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { formatDistance } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { ArrowLeft, Building2, Calendar, ExternalLink, Globe, Linkedin, Mail, Phone, User } from "lucide-react"
+import { ArrowLeft, Building2, Calendar, ExternalLink, Globe, Linkedin, Mail, Phone, User, Instagram, Twitter, Facebook, Youtube } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -19,6 +19,12 @@ import {
 } from "@/components/ui/select"
 import { LeadStatus } from "@prisma/client"
 import { SuggestedContact } from "@/types"
+import RelatedJobsList from "@/components/dashboard/related-jobs-list"
+import ContactSourceBadge from "@/components/dashboard/contact-source-badge"
+import PartnersCard from "@/components/dashboard/partners-card"
+import ContactFeedbackButtons from "@/components/dashboard/contact-feedback-buttons"
+import CompanyEventsCard from "@/components/dashboard/company-events-card"
+import AllContactsCard from "@/components/dashboard/all-contacts-card"
 
 interface Lead {
   id: string
@@ -31,6 +37,21 @@ interface Lead {
     location?: string | null
     website?: string | null
     linkedinUrl?: string | null
+    partners?: string | null
+    companyPhones?: string | null
+    companyEmails?: string | null
+    companyWhatsApp?: string | null
+    instagramHandle?: string | null
+    instagramVerified?: boolean | null
+    twitterHandle?: string | null
+    twitterVerified?: boolean | null
+    facebookHandle?: string | null
+    facebookVerified?: boolean | null
+    youtubeHandle?: string | null
+    youtubeVerified?: boolean | null
+    recentNews?: string | null
+    upcomingEvents?: string | null
+    eventsDetectedAt?: Date | null
   }
   jobTitle: string
   jobDescription: string
@@ -38,6 +59,7 @@ interface Lead {
   jobPostedDate: string
   jobSource: string
   candidateCount?: number | null
+  relatedJobs?: string | null
   suggestedContacts?: string | null
   triggers?: string | null
   status: LeadStatus
@@ -167,13 +189,28 @@ export default function LeadDetailPage() {
 
   try {
     if (lead.suggestedContacts) {
-      suggestedContacts = JSON.parse(lead.suggestedContacts)
+      // Verificar se já é string JSON válida
+      if (typeof lead.suggestedContacts === 'string' && lead.suggestedContacts.startsWith('[')) {
+        suggestedContacts = JSON.parse(lead.suggestedContacts)
+      } else if (typeof lead.suggestedContacts === 'object') {
+        // Se já é objeto, usar diretamente
+        suggestedContacts = lead.suggestedContacts as any
+      }
     }
     if (lead.triggers) {
-      triggers = JSON.parse(lead.triggers)
+      // Verificar se já é string JSON válida
+      if (typeof lead.triggers === 'string' && lead.triggers.startsWith('[')) {
+        triggers = JSON.parse(lead.triggers)
+      } else if (typeof lead.triggers === 'object') {
+        // Se já é objeto, usar diretamente
+        triggers = lead.triggers as any
+      }
     }
   } catch (e) {
-    console.error('Erro ao parsear JSON:', e)
+    console.error('Erro ao parsear JSON:', e, {
+      suggestedContacts: lead.suggestedContacts?.substring(0, 100),
+      triggers: lead.triggers?.substring(0, 100)
+    })
   }
 
   return (
@@ -241,7 +278,7 @@ export default function LeadDetailPage() {
                 </div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {lead.company.website && (
                   <Button variant="outline" size="sm" asChild>
                     <a href={lead.company.website} target="_blank" rel="noopener noreferrer">
@@ -258,6 +295,67 @@ export default function LeadDetailPage() {
                     </a>
                   </Button>
                 )}
+                {lead.company.instagramHandle && (
+                  <Button variant="outline" size="sm" asChild>
+                    <a
+                      href={`https://instagram.com/${lead.company.instagramHandle}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="relative"
+                    >
+                      <Instagram className="h-4 w-4 mr-2" />
+                      Instagram
+                      {lead.company.instagramVerified && (
+                        <span className="ml-1 text-green-600" title="Verificado no website">✓</span>
+                      )}
+                    </a>
+                  </Button>
+                )}
+                {lead.company.twitterHandle && (
+                  <Button variant="outline" size="sm" asChild>
+                    <a
+                      href={`https://twitter.com/${lead.company.twitterHandle}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Twitter className="h-4 w-4 mr-2" />
+                      Twitter
+                      {lead.company.twitterVerified && (
+                        <span className="ml-1 text-green-600" title="Verificado no website">✓</span>
+                      )}
+                    </a>
+                  </Button>
+                )}
+                {lead.company.facebookHandle && (
+                  <Button variant="outline" size="sm" asChild>
+                    <a
+                      href={`https://facebook.com/${lead.company.facebookHandle}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Facebook className="h-4 w-4 mr-2" />
+                      Facebook
+                      {lead.company.facebookVerified && (
+                        <span className="ml-1 text-green-600" title="Verificado no website">✓</span>
+                      )}
+                    </a>
+                  </Button>
+                )}
+                {lead.company.youtubeHandle && (
+                  <Button variant="outline" size="sm" asChild>
+                    <a
+                      href={`https://youtube.com/${lead.company.youtubeHandle}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Youtube className="h-4 w-4 mr-2" />
+                      YouTube
+                      {lead.company.youtubeVerified && (
+                        <span className="ml-1 text-green-600" title="Verificado no website">✓</span>
+                      )}
+                    </a>
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -267,7 +365,7 @@ export default function LeadDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5" />
-                Vaga Ativa
+                Vaga Principal
               </CardTitle>
               <CardDescription>
                 Publicada {daysAgo} no {lead.jobSource}
@@ -290,11 +388,32 @@ export default function LeadDetailPage() {
               <Button variant="outline" asChild>
                 <a href={lead.jobUrl} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="h-4 w-4 mr-2" />
-                  Ver vaga completa no LinkedIn
+                  Verificar Vaga
                 </a>
               </Button>
             </CardContent>
           </Card>
+
+          {/* Vagas Relacionadas */}
+          <RelatedJobsList
+            relatedJobsJson={lead.relatedJobs || null}
+            companyName={lead.company.name}
+          />
+
+          {/* Sócios e Contatos Corporativos */}
+          <PartnersCard
+            partnersJson={lead.company.partners}
+            companyPhones={lead.company.companyPhones}
+            companyEmails={lead.company.companyEmails}
+            companyWhatsApp={lead.company.companyWhatsApp}
+          />
+
+          {/* Eventos e Notícias */}
+          <CompanyEventsCard
+            recentNewsJson={lead.company.recentNews}
+            upcomingEventsJson={lead.company.upcomingEvents}
+            eventsDetectedAt={lead.company.eventsDetectedAt}
+          />
 
           {/* Notas e Histórico */}
           <Card>
@@ -353,14 +472,19 @@ export default function LeadDetailPage() {
                   <User className="h-5 w-5" />
                   Decisores Identificados
                 </CardTitle>
-                <CardDescription>Sugeridos por IA</CardDescription>
+                <CardDescription>
+                  Sugeridos por IA e fontes públicas
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {suggestedContacts.map((contact, idx) => (
                   <div key={idx} className="space-y-2">
-                    <div>
-                      <p className="font-semibold">{contact.name}</p>
-                      <p className="text-sm text-gray-500">{contact.role}</p>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <p className="font-semibold">{contact.name}</p>
+                        <p className="text-sm text-gray-500">{contact.role}</p>
+                      </div>
+                      <ContactSourceBadge source={contact.source} />
                     </div>
                     <div className="flex flex-col gap-1">
                       {contact.linkedin && (
@@ -390,7 +514,17 @@ export default function LeadDetailPage() {
                         </span>
                       )}
                     </div>
-                    {idx < suggestedContacts.length - 1 && <hr />}
+
+                    {/* Botões de Feedback */}
+                    <div className="mt-2 pt-2 border-t">
+                      <p className="text-xs text-gray-500 mb-2">Este contato está correto?</p>
+                      <ContactFeedbackButtons
+                        leadId={lead.id}
+                        contact={contact}
+                      />
+                    </div>
+
+                    {idx < suggestedContacts.length - 1 && <hr className="mt-4" />}
                   </div>
                 ))}
               </CardContent>
@@ -401,7 +535,7 @@ export default function LeadDetailPage() {
           {triggers.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>🎯 Gatilhos de Abordagem</CardTitle>
+                <CardTitle> Gatilhos de Abordagem</CardTitle>
                 <CardDescription>Insights gerados por IA</CardDescription>
               </CardHeader>
               <CardContent>

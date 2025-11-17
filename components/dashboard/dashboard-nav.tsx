@@ -11,19 +11,64 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { User } from "next-auth"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { LayoutList, LayoutDashboard } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface DashboardNavProps {
   user: User
 }
 
 export default function DashboardNav({ user }: DashboardNavProps) {
+  const pathname = usePathname()
+
+  const navItems = [
+    {
+      href: "/dashboard",
+      label: "Lista",
+      icon: LayoutList,
+      active: pathname === "/dashboard" || pathname?.startsWith("/dashboard/leads"),
+    },
+    {
+      href: "/dashboard/kanban",
+      label: "Kanban",
+      icon: LayoutDashboard,
+      active: pathname === "/dashboard/kanban",
+    },
+  ]
+
   return (
     <nav className="border-b bg-white dark:bg-gray-800">
       <div className="container mx-auto px-4 max-w-7xl">
         <div className="flex h-16 items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🚀</span>
-            <h1 className="text-xl font-bold">LeapScout</h1>
+          <div className="flex items-center gap-8">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl"></span>
+              <h1 className="text-xl font-bold">LeapScout</h1>
+            </div>
+
+            {/* Navigation Links */}
+            <div className="hidden md:flex items-center gap-2">
+              {navItems.map((item) => {
+                const Icon = item.icon
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                      item.active
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                  </Link>
+                )
+              })}
+            </div>
           </div>
 
           <div className="flex items-center gap-4">

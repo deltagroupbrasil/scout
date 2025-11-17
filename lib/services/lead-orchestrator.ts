@@ -21,6 +21,7 @@ import { openCNPJEnrichment } from "./opencnpj-enrichment"
 import { novaVidaTIEnrichment } from "./novavidati-enrichment"
 import { websiteIntelligenceScraper } from "./website-intelligence-scraper"
 import { eventsDetector } from "./events-detector"
+// import { socialMediaFinder } from "./social-media-finder" // Temporariamente desabilitado - encoding issues
 
 export class LeadOrchestratorService {
   /**
@@ -30,8 +31,8 @@ export class LeadOrchestratorService {
   async processJobListing(jobData: LinkedInJobData): Promise<string | null> {
     try {
       console.log(`\n${'='.repeat(70)}`)
-      console.log(`📋 Processando vaga: ${jobData.jobTitle}`)
-      console.log(`🏢 Empresa: ${jobData.companyName}`)
+      console.log(` Processando vaga: ${jobData.jobTitle}`)
+      console.log(` Empresa: ${jobData.companyName}`)
       console.log(`${'='.repeat(70)}\n`)
 
       // 1. Buscar ou criar empresa (COM DESCOBERTA DE WEBSITE E SCRAPING)
@@ -41,7 +42,7 @@ export class LeadOrchestratorService {
       )
 
       if (!company) {
-        console.error('❌ Não foi possível criar/encontrar a empresa')
+        console.error(' Não foi possível criar/encontrar a empresa')
         return null
       }
 
@@ -54,12 +55,12 @@ export class LeadOrchestratorService {
       })
 
       if (existingLead) {
-        console.log(`✅ Lead já existe: ${existingLead.id}`)
+        console.log(` Lead já existe: ${existingLead.id}`)
         return existingLead.id
       }
 
       // 3. Buscar PESSOAS REAIS via Google + Web Scraping (NÃO gerar nomes fictícios!)
-      console.log(`\n🔍 Buscando pessoas REAIS da empresa...`)
+      console.log(`\n Buscando pessoas REAIS da empresa...`)
 
       let enrichedContacts: any[] = []
       let triggers: string[] = []
@@ -80,7 +81,7 @@ export class LeadOrchestratorService {
           targetRoles
         )
 
-        console.log(`✅ Encontradas ${realPeople.length} pessoas REAIS`)
+        console.log(` Encontradas ${realPeople.length} pessoas REAIS`)
 
         if (realPeople.length > 0) {
           // FILTRAR: Apenas pessoas com EMAIL ou TELEFONE verificado E VÁLIDO
@@ -109,25 +110,25 @@ export class LeadOrchestratorService {
               source: person.source || 'google', // Marca a fonte do contato
             }))
 
-            console.log(`\n✅ ${enrichedContacts.length} decisores REAIS selecionados (dos ${peopleWithContact.length} válidos)`)
+            console.log(`\n ${enrichedContacts.length} decisores REAIS selecionados (dos ${peopleWithContact.length} válidos)`)
             enrichedContacts.forEach((contact, i) => {
               console.log(`   ${i + 1}. ${contact.name} (${contact.role})`)
-              console.log(`      Email: ${contact.email || '❌'}`)
-              console.log(`      Phone: ${contact.phone || '❌'}`)
-              console.log(`      LinkedIn: ${contact.linkedin ? '✅' : '❌'}`)
+              console.log(`      Email: ${contact.email || ''}`)
+              console.log(`      Phone: ${contact.phone || ''}`)
+              console.log(`      LinkedIn: ${contact.linkedin ? '' : ''}`)
             })
           } else {
-            console.log(`\n⚠️  Pessoas encontradas: ${realPeople.length}, mas NENHUMA com email/phone VÁLIDO`)
-            console.log(`\n❌ Lead será criado SEM CONTATOS (apenas vaga + empresa)`)
+            console.log(`\n  Pessoas encontradas: ${realPeople.length}, mas NENHUMA com email/phone VÁLIDO`)
+            console.log(`\n Lead será criado SEM CONTATOS (apenas vaga + empresa)`)
           }
         } else {
-          console.log(`\n⚠️  Nenhuma pessoa real encontrada via scraping`)
-          console.log(`\n❌ Lead será criado SEM CONTATOS (apenas vaga + empresa)`)
+          console.log(`\n  Nenhuma pessoa real encontrada via scraping`)
+          console.log(`\n Lead será criado SEM CONTATOS (apenas vaga + empresa)`)
         }
 
         // Gerar triggers com IA (sempre fazer, independente de ter pessoas reais ou não)
         if (triggers.length === 0) {
-          console.log(`\n🤖 Gerando triggers com IA...`)
+          console.log(`\n Gerando triggers com IA...`)
           const insights = await aiInsights.generateInsights(
             company.name,
             company.sector || '',
@@ -138,8 +139,8 @@ export class LeadOrchestratorService {
         }
 
       } else {
-        console.log(`\n⚠️  Website não disponível - impossível buscar pessoas reais`)
-        console.log(`\n❌ Lead será criado SEM CONTATOS (apenas vaga + empresa)`)
+        console.log(`\n  Website não disponível - impossível buscar pessoas reais`)
+        console.log(`\n Lead será criado SEM CONTATOS (apenas vaga + empresa)`)
 
         // Gerar apenas triggers com IA (sem contatos fictícios)
         const insights = await aiInsights.generateInsights(
@@ -181,7 +182,7 @@ export class LeadOrchestratorService {
         data: { priorityScore: score },
       })
 
-      console.log(`✅ Lead criado: ${lead.id} (Score: ${score}/100)`)
+      console.log(` Lead criado: ${lead.id} (Score: ${score}/100)`)
       return lead.id
     } catch (error) {
       console.error('Erro ao processar vaga:', error)
@@ -206,9 +207,9 @@ export class LeadOrchestratorService {
       const additionalJobs = jobs.slice(1)
 
       console.log(`\n${'='.repeat(70)}`)
-      console.log(`📋 Processando empresa: ${mainJob.companyName}`)
-      console.log(`🎯 Vaga principal: ${mainJob.jobTitle}`)
-      console.log(`📊 Vagas adicionais: ${additionalJobs.length}`)
+      console.log(` Processando empresa: ${mainJob.companyName}`)
+      console.log(` Vaga principal: ${mainJob.jobTitle}`)
+      console.log(` Vagas adicionais: ${additionalJobs.length}`)
       console.log(`${'='.repeat(70)}\n`)
 
       // 1. Buscar ou criar empresa
@@ -218,7 +219,7 @@ export class LeadOrchestratorService {
       )
 
       if (!company) {
-        console.error('❌ Não foi possível criar/encontrar a empresa')
+        console.error(' Não foi possível criar/encontrar a empresa')
         return null
       }
 
@@ -231,7 +232,7 @@ export class LeadOrchestratorService {
 
       // Se já existe, atualizar com novas vagas
       if (existingLead) {
-        console.log(`✅ Lead já existe para ${company.name}, atualizando vagas...`)
+        console.log(` Lead já existe para ${company.name}, atualizando vagas...`)
 
         // Parse vagas existentes
         const existingRelatedJobs = existingLead.relatedJobs
@@ -266,16 +267,16 @@ export class LeadOrchestratorService {
             }
           })
 
-          console.log(`✅ ${newJobs.length} novas vagas adicionadas ao lead existente`)
+          console.log(` ${newJobs.length} novas vagas adicionadas ao lead existente`)
         } else {
-          console.log(`ℹ️  Todas as vagas já existem no lead`)
+          console.log(`ℹ  Todas as vagas já existem no lead`)
         }
 
         return existingLead.id
       }
 
       // 3. Criar novo lead com todas as vagas
-      console.log(`\n🆕 Criando novo lead para ${company.name}...`)
+      console.log(`\n Criando novo lead para ${company.name}...`)
 
       // Preparar vagas relacionadas (todas exceto a principal)
       const relatedJobsData = additionalJobs.map(j => ({
@@ -287,7 +288,7 @@ export class LeadOrchestratorService {
       }))
 
       // 4. ENRIQUECIMENTO COMPLETO com IA
-      console.log(`\n🤖 Enriquecendo empresa com IA (Claude Sonnet 4.5)...`)
+      console.log(`\n Enriquecendo empresa com IA (Claude Sonnet 4.5)...`)
 
       const aiData = await aiCompanyEnrichment.enrichCompany(
         company.name,
@@ -310,9 +311,9 @@ export class LeadOrchestratorService {
       //     }
       //   })
 
-      //   console.log(`   ✅ Setor: ${aiData.sector || 'N/A'}`)
-      //   console.log(`   ✅ Faturamento: ${aiData.revenue || 'N/A'}`)
-      //   console.log(`   ✅ Funcionários: ${aiData.employees || 'N/A'}`)
+      //   console.log(`    Setor: ${aiData.sector || 'N/A'}`)
+      //   console.log(`    Faturamento: ${aiData.revenue || 'N/A'}`)
+      //   console.log(`    Funcionários: ${aiData.employees || 'N/A'}`)
       // }
 
       // Recarregar empresa com dados atualizados
@@ -321,7 +322,7 @@ export class LeadOrchestratorService {
       })
 
       // 5. Buscar PESSOAS REAIS (Google + Apollo.io)
-      console.log(`\n👥 Buscando pessoas REAIS (Google + Apollo)...`)
+      console.log(`\n Buscando pessoas REAIS (Google + Apollo)...`)
 
       let enrichedContacts = []
       let triggers: string[] = []
@@ -342,7 +343,7 @@ export class LeadOrchestratorService {
           )
 
           if (linkedinPeople.length > 0) {
-            console.log(`✅ LinkedIn encontrou ${linkedinPeople.length} perfis`)
+            console.log(` LinkedIn encontrou ${linkedinPeople.length} perfis`)
 
             // Converter para formato SuggestedContact
             const linkedinContacts = linkedinPeople.slice(0, 3).map(person => ({
@@ -399,11 +400,11 @@ export class LeadOrchestratorService {
         if (enrichedContacts.length === 0) {
           console.log(`\n📍 ESTRATÉGIA 3: Geração de contatos estimados`)
           enrichedContacts = this.generateSmartContacts(company, mainJob.jobTitle, domain)
-          console.log(`✅ ${enrichedContacts.length} contatos estimados gerados`)
+          console.log(` ${enrichedContacts.length} contatos estimados gerados`)
         }
       }
 
-      console.log(`\n✅ Total de contatos encontrados: ${enrichedContacts.length}`)
+      console.log(`\n Total de contatos encontrados: ${enrichedContacts.length}`)
 
       // 6. Gerar triggers (baseado em todas as vagas + dados da IA)
       const allJobTitles = jobs.map(j => j.jobTitle).join(' ')
@@ -437,7 +438,7 @@ export class LeadOrchestratorService {
         },
       })
 
-      console.log(`✅ Lead criado: ${lead.id}`)
+      console.log(` Lead criado: ${lead.id}`)
       console.log(`   - Vaga principal: ${mainJob.jobTitle}`)
       console.log(`   - Vagas relacionadas: ${additionalJobs.length}`)
       console.log(`   - Contatos: ${enrichedContacts.length}`)
@@ -446,7 +447,7 @@ export class LeadOrchestratorService {
 
       return lead.id
     } catch (error) {
-      console.error('❌ Erro ao processar empresa com múltiplas vagas:', error)
+      console.error(' Erro ao processar empresa com múltiplas vagas:', error)
       return null
     }
   }
@@ -465,7 +466,7 @@ export class LeadOrchestratorService {
     )
 
     if (company) {
-      console.log(`✅ Empresa encontrada (consolidada): ${company.name}`)
+      console.log(` Empresa encontrada (consolidada): ${company.name}`)
 
       // Se empresa existe mas não tem website ou está desatualizada, enriquecer
       const shouldReenrich =
@@ -474,41 +475,46 @@ export class LeadOrchestratorService {
         (Date.now() - new Date(company.enrichedAt).getTime()) > 7 * 24 * 60 * 60 * 1000
 
       if (shouldReenrich) {
-        console.log(`🔄 Enriquecendo empresa ${company.name}...`)
+        console.log(` Enriquecendo empresa ${company.name}...`)
         await this.enrichExistingCompany(company.id, company.name, companyUrl)
       }
 
       return company
     }
 
-    console.log(`🆕 Criando nova empresa: ${companyName}`)
+    console.log(` Criando nova empresa: ${companyName}`)
 
     // ============================================================================
     // NOVO PIPELINE OTIMIZADO (Baixo Custo)
     // ============================================================================
 
-    // 1. Buscar CNPJ
-    const cnpj = await this.findCNPJ(companyName, companyUrl)
-    let cnpjData = null
-
-    if (cnpj) {
-      console.log(`📋 CNPJ encontrado: ${cnpj}`)
-      cnpjData = await companyEnrichment.getCompanyByCNPJ(cnpj)
-      await this.sleep(3000) // Rate limit Brasil API
-    }
-
-    // 2. Website Discovery (Claude AI + Smart Logic)
-    console.log(`\n🌐 Descobrindo website...`)
+    // 1. Website Discovery PRIMEIRO (Claude AI + Smart Logic)
+    console.log(`\n Descobrindo website...`)
     const websiteResult = await websiteFinder.findWebsite(
       companyName,
-      companyUrl,
-      cnpjData?.website
+      companyUrl
     )
 
     console.log(`   Website: ${websiteResult.website || 'N/A'}`)
     console.log(`   Domínio: ${websiteResult.domain || 'N/A'}`)
     console.log(`   Confiança: ${websiteResult.confidence}`)
     console.log(`   Fonte: ${websiteResult.source}`)
+
+    // 2. Buscar CNPJ (MELHORADO - agora usa website + Claude AI + Google)
+    console.log(`\n Buscando CNPJ...`)
+    const cnpj = await cnpjFinder.findCNPJByName(
+      companyName,
+      websiteResult.website || undefined
+    )
+
+    let cnpjData = null
+    if (cnpj) {
+      console.log(`    CNPJ encontrado: ${this.formatCNPJ(cnpj)}`)
+      cnpjData = await companyEnrichment.getCompanyByCNPJ(cnpj)
+      await this.sleep(3000) // Rate limit Brasil API
+    } else {
+      console.log(`     CNPJ não encontrado`)
+    }
 
     // 2.5. Website Intelligence Scraping (NOVO) - Extrai CNPJ, redes sociais, telefones, emails
     let websiteIntelligence = null
@@ -519,20 +525,24 @@ export class LeadOrchestratorService {
 
         // Se encontrou CNPJ no site e ainda não tinha, usar ele
         if (websiteIntelligence.cnpj && !cnpj) {
-          console.log(`   ✅ CNPJ encontrado no website: ${websiteIntelligence.cnpj}`)
+          console.log(`    CNPJ encontrado no website: ${websiteIntelligence.cnpj}`)
           cnpjData = await companyEnrichment.getCompanyByCNPJ(websiteIntelligence.cnpj)
           await this.sleep(3000)
         }
       } catch (error) {
-        console.error(`   ❌ Erro ao extrair intelligence do website:`, error)
+        console.error(`    Erro ao extrair intelligence do website:`, error)
       }
     }
+
+    // 2.6. Social Media Discovery - TEMPORARIAMENTE DESABILITADO (encoding issues)
+    // TODO: Recriar social-media-finder.ts com encoding UTF-8 correto
+    let socialMediaProfiles = null
 
     // 3. LinkedIn Company Scraping (Bright Data) - DADOS REAIS
     let linkedInData = null
     if (companyUrl && companyUrl.includes('linkedin.com')) {
       try {
-        console.log(`\n📊 Scraping LinkedIn Company Page...`)
+        console.log(`\n Scraping LinkedIn Company Page...`)
         linkedInData = await linkedInCompanyScraper.scrapeCompanyPage(companyUrl)
 
         console.log(`   Seguidores: ${linkedInData.followers?.toLocaleString() || 'N/A'}`)
@@ -546,12 +556,12 @@ export class LeadOrchestratorService {
           websiteResult.domain = websiteFinder.extractDomain(linkedInData.website) || websiteResult.domain
           websiteResult.confidence = 'high'
           websiteResult.source = 'linkedin_scraping'
-          console.log(`   ✅ Website atualizado do LinkedIn: ${linkedInData.website}`)
+          console.log(`    Website atualizado do LinkedIn: ${linkedInData.website}`)
         }
 
         await this.sleep(2000)
       } catch (error) {
-        console.error(`   ❌ Erro ao scraping LinkedIn:`, error)
+        console.error(`    Erro ao scraping LinkedIn:`, error)
       }
     }
 
@@ -563,14 +573,31 @@ export class LeadOrchestratorService {
         revenue: cnpjData?.revenue || null,
         employees: linkedInData?.employeesCount || cnpjData?.employees || null, // Prioriza LinkedIn real
         sector: linkedInData?.industry || cnpjData?.sector || null,
+
+        // Website
         website: websiteResult.website || cnpjData?.website || null,
-        linkedinUrl: companyUrl || null,
-        linkedinFollowers: linkedInData?.followers || null, // REAL do LinkedIn
+        websiteSource: websiteResult.source || null,
+        websiteConfidence: websiteResult.confidence || null,
+        websiteVerifiedAt: websiteResult.website ? new Date() : null,
+
+        // LinkedIn
+        linkedinUrl: socialMediaProfiles?.linkedin || companyUrl || null,
+        linkedinFollowers: linkedInData?.followers?.toString() || null,
+
+        // Redes Sociais (do Social Media Finder)
+        instagramUrl: socialMediaProfiles?.instagram || null,
+        twitterUrl: socialMediaProfiles?.twitter || null,
+        facebookUrl: socialMediaProfiles?.facebook || null,
+        youtubeUrl: socialMediaProfiles?.youtube || null,
+        socialMediaSource: socialMediaProfiles?.source || null,
+        socialMediaUpdatedAt: socialMediaProfiles ? new Date() : null,
+
+        // Localização
         location: linkedInData?.headquarters || null,
       },
     })
 
-    console.log(`✅ Empresa criada: ${company.name}`)
+    console.log(` Empresa criada: ${company.name}`)
 
     // 4.5. Salvar dados do Website Intelligence
     if (websiteIntelligence) {
@@ -580,41 +607,41 @@ export class LeadOrchestratorService {
       if (websiteIntelligence.instagram) {
         updateData.instagramHandle = websiteIntelligence.instagram.handle
         updateData.instagramVerified = websiteIntelligence.instagram.verified
-        console.log(`   ✅ Instagram verificado: @${websiteIntelligence.instagram.handle}`)
+        console.log(`    Instagram verificado: @${websiteIntelligence.instagram.handle}`)
       }
 
       if (websiteIntelligence.twitter) {
         updateData.twitterHandle = websiteIntelligence.twitter.handle
         updateData.twitterVerified = websiteIntelligence.twitter.verified
-        console.log(`   ✅ Twitter verificado: @${websiteIntelligence.twitter.handle}`)
+        console.log(`    Twitter verificado: @${websiteIntelligence.twitter.handle}`)
       }
 
       if (websiteIntelligence.facebook) {
         updateData.facebookHandle = websiteIntelligence.facebook.handle
         updateData.facebookVerified = websiteIntelligence.facebook.verified
-        console.log(`   ✅ Facebook verificado: ${websiteIntelligence.facebook.handle}`)
+        console.log(`    Facebook verificado: ${websiteIntelligence.facebook.handle}`)
       }
 
       if (websiteIntelligence.youtube) {
         updateData.youtubeHandle = websiteIntelligence.youtube.handle
         updateData.youtubeVerified = websiteIntelligence.youtube.verified
-        console.log(`   ✅ YouTube verificado: ${websiteIntelligence.youtube.handle}`)
+        console.log(`    YouTube verificado: ${websiteIntelligence.youtube.handle}`)
       }
 
       // Telefones e emails do website (se ainda não temos do Nova Vida TI)
       if (websiteIntelligence.phones.length > 0 && !company.companyPhones) {
         updateData.companyPhones = JSON.stringify(websiteIntelligence.phones)
-        console.log(`   ✅ ${websiteIntelligence.phones.length} telefone(s) do website`)
+        console.log(`    ${websiteIntelligence.phones.length} telefone(s) do website`)
       }
 
       if (websiteIntelligence.emails.length > 0 && !company.companyEmails) {
         updateData.companyEmails = JSON.stringify(websiteIntelligence.emails)
-        console.log(`   ✅ ${websiteIntelligence.emails.length} email(s) do website`)
+        console.log(`    ${websiteIntelligence.emails.length} email(s) do website`)
       }
 
       if (websiteIntelligence.whatsapp && !company.companyWhatsApp) {
         updateData.companyWhatsApp = websiteIntelligence.whatsapp
-        console.log(`   ✅ WhatsApp do website: ${websiteIntelligence.whatsapp}`)
+        console.log(`    WhatsApp do website: ${websiteIntelligence.whatsapp}`)
       }
 
       // Atualizar se temos dados
@@ -638,65 +665,83 @@ export class LeadOrchestratorService {
   }
 
   /**
-   * Enriquece dados de sócios via OpenCNPJ + Nova Vida TI
+   * Enriquece dados de sócios via Nova Vida API (FONTE PRINCIPAL)
+   * Fluxo: Claude API encontra CNPJ → Nova Vida API retorna sócios com contatos
    */
   private async enrichPartnersData(company: any): Promise<void> {
-    if (!company.cnpj) return
+    if (!company.cnpj) {
+      console.log(`\n   Sem CNPJ - pulando enriquecimento de socios`)
+      return
+    }
 
     try {
-      console.log(`\n👥 Enriquecendo dados de sócios...`)
+      console.log(`\n Consultando Nova Vida API (CNPJ: ${company.cnpj})...`)
 
-      // 1. OpenCNPJ - Dados oficiais de sócios (grátis)
-      const openCNPJData = await openCNPJEnrichment.getCompanyData(company.cnpj)
+      // Nova Vida API - Dados completos de sócios com telefones e emails
+      const novaVidaData = await novaVidaTIEnrichment.enrichCompanyContacts(
+        company.cnpj,
+        company.name
+      )
 
-      if (openCNPJData && openCNPJData.socios.length > 0) {
-        console.log(`   ✅ OpenCNPJ: ${openCNPJData.socios.length} sócios encontrados`)
+      if (!novaVidaData) {
+        console.log(`    Nova Vida API: Sem dados disponiveis`)
 
-        // 2. Nova Vida TI - Telefones e emails dos sócios (pago)
-        const novaVidaData = await novaVidaTIEnrichment.enrichCompanyContacts(
-          company.cnpj,
-          company.name
-        )
+        // Fallback: tentar OpenCNPJ (apenas dados basicos, sem contatos)
+        const openCNPJData = await openCNPJEnrichment.getCompanyData(company.cnpj)
+        if (openCNPJData && openCNPJData.socios.length > 0) {
+          console.log(`    OpenCNPJ (fallback): ${openCNPJData.socios.length} socios encontrados (sem contatos)`)
 
-        // Combinar dados: OpenCNPJ (oficial) + Nova Vida TI (contatos)
-        const partnersData = openCNPJData.socios.map(socio => {
-          // Buscar dados do sócio na Nova Vida TI
-          const novaVidaSocio = novaVidaData?.socios.find(
-            s => s.nome.toLowerCase() === socio.nome.toLowerCase()
-          )
-
-          return {
+          const partnersData = openCNPJData.socios.map(socio => ({
             nome: socio.nome,
             qualificacao: socio.qualificacao,
-            telefones: novaVidaSocio?.telefones || [],
-            emails: novaVidaSocio?.emails || [],
-            linkedin: null,  // Será preenchido via LinkedIn Scraper futuramente
-          }
-        })
+            telefones: [],
+            emails: [],
+            linkedin: null,
+          }))
 
-        // Atualizar empresa com dados de sócios e contatos
-        await prisma.company.update({
-          where: { id: company.id },
-          data: {
-            partners: JSON.stringify(partnersData),
-            companyPhones: novaVidaData?.telefones ? JSON.stringify(novaVidaData.telefones) : null,
-            companyEmails: novaVidaData?.emails ? JSON.stringify(novaVidaData.emails) : null,
-            companyWhatsApp: novaVidaData?.whatsapp?.[0] || null,
-            partnersLastUpdate: new Date(),
-          }
-        })
-
-        console.log(`   ✅ Dados de sócios salvos: ${partnersData.length} sócios`)
-        if (novaVidaData) {
-          console.log(`   📞 Telefones corporativos: ${novaVidaData.telefones.length}`)
-          console.log(`   📧 Emails corporativos: ${novaVidaData.emails.length}`)
+          await prisma.company.update({
+            where: { id: company.id },
+            data: {
+              partners: JSON.stringify(partnersData),
+              partnersLastUpdate: new Date(),
+            }
+          })
         }
-      } else {
-        console.log(`   ⚠️  OpenCNPJ: Nenhum sócio encontrado`)
+        return
       }
 
+      // Preparar dados dos sócios
+      const partnersData = novaVidaData.socios.map(socio => ({
+        nome: socio.nome,
+        qualificacao: socio.qualificacao,
+        telefones: socio.telefones || [],
+        emails: socio.emails || [],
+        linkedin: socio.linkedin || null,
+      }))
+
+      // Atualizar empresa com dados completos
+      await prisma.company.update({
+        where: { id: company.id },
+        data: {
+          partners: JSON.stringify(partnersData),
+          companyPhones: novaVidaData.telefones ? JSON.stringify(novaVidaData.telefones) : null,
+          companyEmails: novaVidaData.emails ? JSON.stringify(novaVidaData.emails) : null,
+          companyWhatsApp: novaVidaData.whatsapp?.[0] || null,
+          partnersLastUpdate: new Date(),
+        }
+      })
+
+      console.log(`    Socios salvos: ${partnersData.length}`)
+      console.log(`    Telefones corporativos: ${novaVidaData.telefones.length}`)
+      console.log(`    Emails corporativos: ${novaVidaData.emails.length}`)
+
+      // Contar total de contatos dos socios
+      const totalPhones = partnersData.reduce((sum, p) => sum + p.telefones.length, 0)
+      const totalEmails = partnersData.reduce((sum, p) => sum + p.emails.length, 0)
+      console.log(`    Contatos dos socios: ${totalPhones} telefones, ${totalEmails} emails`)
+
     } catch (error) {
-      console.error('❌ Erro ao enriquecer dados de sócios:', error)
+      console.error(' Erro ao enriquecer dados de socios:', error)
     }
   }
 
@@ -714,7 +759,7 @@ export class LeadOrchestratorService {
 
       // 1. Website Discovery (se não tiver)
       if (!company.website && companyUrl) {
-        console.log(`\n🌐 Descobrindo website...`)
+        console.log(`\n Descobrindo website...`)
         const websiteResult = await websiteFinder.findWebsite(
           companyName,
           companyUrl,
@@ -726,14 +771,14 @@ export class LeadOrchestratorService {
             where: { id: companyId },
             data: { website: websiteResult.website },
           })
-          console.log(`   ✅ Website descoberto: ${websiteResult.website}`)
+          console.log(`    Website descoberto: ${websiteResult.website}`)
         }
       }
 
       // 2. LinkedIn Scraping (se tiver URL e não tiver followers)
       if (company.linkedinUrl && !company.linkedinFollowers) {
         try {
-          console.log(`\n📊 Scraping LinkedIn Company Page...`)
+          console.log(`\n Scraping LinkedIn Company Page...`)
           const linkedInData = await linkedInCompanyScraper.scrapeCompanyPage(company.linkedinUrl)
 
           await prisma.company.update({
@@ -747,17 +792,17 @@ export class LeadOrchestratorService {
             },
           })
 
-          console.log(`   ✅ LinkedIn atualizado: ${linkedInData.followers} seguidores`)
+          console.log(`    LinkedIn atualizado: ${linkedInData.followers} seguidores`)
           await this.sleep(2000)
         } catch (error) {
-          console.error(`   ❌ Erro ao scraping LinkedIn:`, error)
+          console.error(`    Erro ao scraping LinkedIn:`, error)
         }
       }
 
       // 3. AI Enrichment (CNPJ, revenue, employees, setor)
       await this.enrichCompanyWithAI(companyId, companyName, company.sector, company.website)
     } catch (error) {
-      console.error(`❌ Erro ao enriquecer empresa ${companyName}:`, error)
+      console.error(` Erro ao enriquecer empresa ${companyName}:`, error)
     }
   }
 
@@ -776,6 +821,17 @@ export class LeadOrchestratorService {
   }
 
   /**
+   * Formata CNPJ para exibição (XX.XXX.XXX/XXXX-XX)
+   */
+  private formatCNPJ(cnpj: string): string {
+    const clean = cnpj.replace(/\D/g, '')
+    return clean.replace(
+      /^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,
+      '$1.$2.$3/$4-$5'
+    )
+  }
+
+  /**
    * Enriquece empresa com dados de IA (notícias, Instagram, eventos)
    */
   private async enrichCompanyWithAI(
@@ -785,7 +841,7 @@ export class LeadOrchestratorService {
     website?: string | null
   ): Promise<void> {
     try {
-      console.log(`🤖 [AI Enrichment] Enriquecendo ${companyName}...`)
+      console.log(` [AI Enrichment] Enriquecendo ${companyName}...`)
 
       const aiData = await aiCompanyEnrichment.enrichCompany(
         companyName,
@@ -822,7 +878,7 @@ export class LeadOrchestratorService {
         const revenueNumber = this.extractRevenueFromString(aiData.revenue)
         if (revenueNumber) {
           updateData.revenue = revenueNumber
-          console.log(`   💰 Revenue (da IA): R$ ${(revenueNumber / 1_000_000).toFixed(1)}M`)
+          console.log(`    Revenue (da IA): R$ ${(revenueNumber / 1_000_000).toFixed(1)}M`)
         }
       }
 
@@ -830,7 +886,7 @@ export class LeadOrchestratorService {
         const employeesNumber = this.extractEmployeesFromString(aiData.employees)
         if (employeesNumber) {
           updateData.employees = employeesNumber
-          console.log(`   👥 Funcionários (da IA): ${employeesNumber}`)
+          console.log(`    Funcionários (da IA): ${employeesNumber}`)
         }
       }
 
@@ -843,17 +899,17 @@ export class LeadOrchestratorService {
         const validation = await cnpjValidator.validateCNPJ(aiData.cnpj, companyName)
 
         if (validation.isValid) {
-          console.log(`   ✅ CNPJ VALIDADO! (confidence: ${validation.confidence})`)
+          console.log(`    CNPJ VALIDADO! (confidence: ${validation.confidence})`)
           console.log(`      ${validation.reason}`)
           console.log(`      Razão Social: ${validation.actualCompanyName}`)
           updateData.cnpj = aiData.cnpj
         } else {
-          console.log(`   ❌ CNPJ REJEITADO! (confidence: ${validation.confidence})`)
+          console.log(`    CNPJ REJEITADO! (confidence: ${validation.confidence})`)
           console.log(`      ${validation.reason}`)
           if (validation.actualCompanyName) {
             console.log(`      CNPJ pertence a: ${validation.actualCompanyName}`)
           }
-          console.log(`   ⚠️  Não salvando CNPJ incorreto no banco`)
+          console.log(`     Não salvando CNPJ incorreto no banco`)
           // NÃO salva CNPJ inválido
           aiData.cnpj = undefined
         }
@@ -865,15 +921,15 @@ export class LeadOrchestratorService {
             if (cnpjData) {
               if (!currentCompany?.revenue && cnpjData.revenue) {
                 updateData.revenue = cnpjData.revenue
-                console.log(`   💰 Revenue da Receita: R$ ${(cnpjData.revenue / 1_000_000).toFixed(1)}M`)
+                console.log(`    Revenue da Receita: R$ ${(cnpjData.revenue / 1_000_000).toFixed(1)}M`)
               }
               if (!currentCompany?.employees && cnpjData.employees) {
                 updateData.employees = cnpjData.employees
-                console.log(`   👥 Funcionários da Receita: ${cnpjData.employees}`)
+                console.log(`    Funcionários da Receita: ${cnpjData.employees}`)
               }
             }
           } catch (error) {
-            console.warn(`   ⚠️  Erro ao buscar CNPJ na Receita Federal:`, error)
+            console.warn(`     Erro ao buscar CNPJ na Receita Federal:`, error)
           }
         }
       }
@@ -884,9 +940,9 @@ export class LeadOrchestratorService {
         data: updateData,
       })
 
-      console.log(`✅ [AI Enrichment] ${companyName} enriquecida com sucesso!`)
+      console.log(` [AI Enrichment] ${companyName} enriquecida com sucesso!`)
     } catch (error) {
-      console.error(`❌ [AI Enrichment] Erro ao enriquecer ${companyName}:`, error)
+      console.error(` [AI Enrichment] Erro ao enriquecer ${companyName}:`, error)
     }
   }
 
@@ -895,7 +951,7 @@ export class LeadOrchestratorService {
    */
   private async detectCompanyEvents(companyId: string, companyName: string): Promise<void> {
     try {
-      console.log(`\n🔍 [Event Detection] Detectando eventos: ${companyName}`)
+      console.log(`\n [Event Detection] Detectando eventos: ${companyName}`)
 
       // Buscar redes sociais verificadas
       const company = await prisma.company.findUnique({
@@ -937,7 +993,7 @@ export class LeadOrchestratorService {
       const eventResult = await eventsDetector.detectEvents(companyName, socialMedia)
 
       if (eventResult.events.length === 0) {
-        console.log(`   ℹ️  Nenhum evento relevante detectado`)
+        console.log(`   ℹ  Nenhum evento relevante detectado`)
         return
       }
 
@@ -946,7 +1002,7 @@ export class LeadOrchestratorService {
         e.relevance === 'high' || e.relevance === 'medium'
       )
 
-      console.log(`   ✅ ${relevantEvents.length} eventos relevantes detectados`)
+      console.log(`    ${relevantEvents.length} eventos relevantes detectados`)
 
       // Separar notícias recentes e eventos futuros
       const now = new Date()
@@ -988,15 +1044,15 @@ export class LeadOrchestratorService {
 
       // Log dos eventos mais relevantes
       relevantEvents.slice(0, 3).forEach(event => {
-        const icon = event.type === 'funding' ? '💰' :
+        const icon = event.type === 'funding' ? '' :
                      event.type === 'leadership_change' ? '👔' :
                      event.type === 'award' ? '🏆' :
-                     event.type === 'expansion' ? '🚀' : '📰'
+                     event.type === 'expansion' ? '' : '📰'
         console.log(`   ${icon} ${event.title}`)
       })
 
     } catch (error) {
-      console.error(`   ❌ Erro ao detectar eventos:`, error)
+      console.error(`    Erro ao detectar eventos:`, error)
     }
   }
 
@@ -1010,7 +1066,7 @@ export class LeadOrchestratorService {
     // 1. Tentar extrair da URL (LinkedIn às vezes tem CNPJ na URL)
     const cnpjFromUrl = cnpjFinder.extractCNPJFromURL(companyUrl)
     if (cnpjFromUrl) {
-      console.log(`✅ CNPJ extraído da URL: ${cnpjFromUrl}`)
+      console.log(` CNPJ extraído da URL: ${cnpjFromUrl}`)
       return cnpjFromUrl
     }
 
@@ -1045,8 +1101,8 @@ export class LeadOrchestratorService {
     errors: string[]
   }> {
     const { query, maxCompanies = 20 } = options
-    console.log('🔍 Iniciando scraping de vagas de múltiplas fontes...')
-    console.log(`⚙️  Limite: ${maxCompanies} empresas`)
+    console.log(' Iniciando scraping de vagas de múltiplas fontes...')
+    console.log(`⚙  Limite: ${maxCompanies} empresas`)
 
     // Buscar em múltiplas localizações para ter mais resultados
     const locations = [
@@ -1067,7 +1123,7 @@ export class LeadOrchestratorService {
     // Buscar LinkedIn em todas as localizações (7 dias de vagas)
     for (const location of locations) {
       try {
-        console.log(`🔍 LinkedIn: ${location}`)
+        console.log(` LinkedIn: ${location}`)
         const jobs = await linkedInScraper.searchJobs(query, location, 7) // 7 dias
         allLinkedInJobs.push(...jobs)
         await this.sleep(2000) // Delay entre buscas
@@ -1096,12 +1152,12 @@ export class LeadOrchestratorService {
       }),
     ])
 
-    // 🔄 FALLBACK PÚBLICO: Se todas as fontes falharem (< 5 vagas), usar scraping público
+    //  FALLBACK PÚBLICO: Se todas as fontes falharem (< 5 vagas), usar scraping público
     let publicJobs: LinkedInJobData[] = []
     const totalJobs = allLinkedInJobs.length + indeedJobs.length + glassdoorJobs.length + gupyJobs.length + cathoJobs.length
 
     if (totalJobs < 5) {
-      console.log(`\n⚠️  Poucas vagas encontradas (${totalJobs}), ativando FALLBACK PÚBLICO...`)
+      console.log(`\n  Poucas vagas encontradas (${totalJobs}), ativando FALLBACK PÚBLICO...`)
       publicJobs = await publicScraper.scrapeJobs(query).catch(err => {
         console.error('[PublicScraper] Erro:', err)
         return []
@@ -1109,11 +1165,11 @@ export class LeadOrchestratorService {
 
       // Se ainda assim não encontrou nada, usar fallback de empresas reais
       if (publicJobs.length === 0) {
-        console.log('🔄 Usando fallback de empresas reais brasileiras')
+        console.log(' Usando fallback de empresas reais brasileiras')
         publicJobs = publicScraper.getFallbackJobs(query)
       }
 
-      console.log(`✅ Fallback público retornou ${publicJobs.length} vagas\n`)
+      console.log(` Fallback público retornou ${publicJobs.length} vagas\n`)
     }
 
     // Combinar todos os jobs
@@ -1126,7 +1182,7 @@ export class LeadOrchestratorService {
       ...publicJobs.map(j => ({ ...j, source: j.jobSource || 'Público' })),
     ]
 
-    console.log(`📊 Total de vagas encontradas: ${allJobs.length}`)
+    console.log(` Total de vagas encontradas: ${allJobs.length}`)
     console.log(`   - LinkedIn: ${allLinkedInJobs.length}`)
     console.log(`   - Indeed: ${indeedJobs.length}`)
     console.log(`   - Glassdoor: ${glassdoorJobs.length}`)
@@ -1138,7 +1194,7 @@ export class LeadOrchestratorService {
 
     // Filtrar vagas irrelevantes
     const relevantJobs = allJobs.filter(job => this.isRelevantJob(job.jobTitle))
-    console.log(`🔍 Vagas relevantes após filtro: ${relevantJobs.length}`)
+    console.log(` Vagas relevantes após filtro: ${relevantJobs.length}`)
 
     // AGRUPAR vagas por empresa e limitar a N empresas
     const jobsByCompany = new Map<string, LinkedInJobData[]>()
@@ -1156,15 +1212,15 @@ export class LeadOrchestratorService {
     // Limitar a N empresas
     const limitedCompanies = Array.from(jobsByCompany.entries()).slice(0, maxCompanies)
 
-    console.log(`🎯 Processando ${limitedCompanies.length} empresas únicas (limite: ${maxCompanies})`)
-    console.log(`📊 Total de vagas: ${limitedCompanies.reduce((sum, [_, jobs]) => sum + jobs.length, 0)}`)
+    console.log(` Processando ${limitedCompanies.length} empresas únicas (limite: ${maxCompanies})`)
+    console.log(` Total de vagas: ${limitedCompanies.reduce((sum, [_, jobs]) => sum + jobs.length, 0)}`)
 
     let successCount = 0
     const errors: string[] = []
 
     // Processar cada empresa (agrupa múltiplas vagas em um único lead)
     for (const [companyName, jobs] of limitedCompanies) {
-      console.log(`\n🏢 Processando: ${jobs[0].companyName} (${jobs.length} vagas)`)
+      console.log(`\n Processando: ${jobs[0].companyName} (${jobs.length} vagas)`)
 
       try {
         const leadId = await this.processCompanyWithMultipleJobs(jobs)
@@ -1173,7 +1229,7 @@ export class LeadOrchestratorService {
         }
       } catch (error) {
         const errorMsg = `Erro ao processar ${jobs[0].companyName}: ${error instanceof Error ? error.message : String(error)}`
-        console.error(`❌ ${errorMsg}`)
+        console.error(` ${errorMsg}`)
         errors.push(errorMsg)
       }
 
@@ -1181,7 +1237,7 @@ export class LeadOrchestratorService {
       await this.sleep(1000)
     }
 
-    console.log(`✅ ${successCount} leads criados com sucesso`)
+    console.log(` ${successCount} leads criados com sucesso`)
 
     return {
       totalJobs: allJobs.length,
@@ -1243,7 +1299,7 @@ export class LeadOrchestratorService {
     )
 
     if (hasIrrelevantTerms) {
-      console.log(`⏭️  Pulando vaga irrelevante: ${jobTitle}`)
+      console.log(`⏭  Pulando vaga irrelevante: ${jobTitle}`)
       return false
     }
 
@@ -1253,7 +1309,7 @@ export class LeadOrchestratorService {
     )
 
     if (!hasRelevantTerms) {
-      console.log(`⏭️  Pulando vaga sem termos relevantes: ${jobTitle}`)
+      console.log(`⏭  Pulando vaga sem termos relevantes: ${jobTitle}`)
       return false
     }
 
