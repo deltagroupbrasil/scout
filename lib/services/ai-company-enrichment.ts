@@ -5,6 +5,7 @@ import Anthropic from '@anthropic-ai/sdk'
 
 interface CompanyEnrichmentData {
   cnpj?: string // CNPJ encontrado pela IA (14 dígitos)
+  sector?: string // Setor de atuação da empresa
   estimatedRevenue?: string
   estimatedEmployees?: string
   location?: string
@@ -66,9 +67,9 @@ export class AICompanyEnrichmentService {
       const prompt = this.buildEnrichmentPrompt(companyName, companySector, companyWebsite)
 
       const message = await this.client.messages.create({
-        model: 'claude-3-5-haiku-20241022',
-        max_tokens: 2000,
-        temperature: 0.3,
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: 4000,
+        temperature: 0.2,
         messages: [
           {
             role: 'user',
@@ -106,15 +107,25 @@ IMPORTANTE: Use dados REAIS encontrados na internet (Glassdoor, LinkedIn, site d
 
 Por favor, pesquise e forneça:
 
-1. **CNPJ**: Busque o CNPJ REAL da empresa (14 dígitos, formato: 00.000.000/0000-00). Se não encontrar, use "Não disponível".
+1. **CNPJ**: Busque o CNPJ REAL da empresa (14 dígitos, formato: 00.000.000/0000-00).
+   - CRÍTICO: Verifique se o CNPJ é REALMENTE da empresa solicitada
+   - Busque no site oficial, Wikipedia, ou Receita Federal
+   - CUIDADO: Empresas com nomes parecidos têm CNPJs diferentes
+   - Exemplo: PagBank ≠ Mercado Pago ≠ PagSeguro (são empresas distintas!)
+   - Se não tiver 100% de certeza, use "Não disponível"
 
 2. **Faturamento Anual**:
-   - PRIORIDADE 1: Busque no site oficial da empresa (seção "Sobre", "Relatórios", "Investidores")
-   - PRIORIDADE 2: Notícias recentes sobre faturamento/receita
-   - PRIORIDADE 3: Glassdoor, Infomoney, sites de notícias financeiras
-   - PRIORIDADE 4: Estimativa baseada no porte/setor (especificar que é estimativa)
-   - Formato: "R$ X milhões" ou "R$ X - R$ Y milhões" (faixa)
-   - Se não encontrar, use "Não disponível"
+   - CRÍTICO: Busque DADOS REAIS de faturamento/receita. Faça múltiplas buscas na web se necessário.
+   - PRIORIDADE 1: Site oficial - seção "Sobre", "Investor Relations", "Resultados Financeiros"
+   - PRIORIDADE 2: Notícias recentes (últimos 12 meses) sobre resultados financeiros, balanços
+   - PRIORIDADE 3: Sites especializados: Valor Econômico, InfoMoney, Exame, Forbes Brasil
+   - PRIORIDADE 4: Relatórios setoriais, Glassdoor, páginas "Sobre a empresa"
+   - PRIORIDADE 5: Se for empresa de capital aberto, busque relatórios CVM/B3
+   - PRIORIDADE 6: Para fintechs/startups, busque rodadas de investimento e valuation
+   - ÚLTIMA OPÇÃO: Estimativa baseada em número de funcionários + setor (especifique que é estimativa)
+   - Formato: "R$ X milhões" ou "R$ X bilhão" ou "R$ X - R$ Y milhões" (faixa)
+   - NUNCA deixe "Não disponível" sem antes fazer PELO MENOS 3 buscas diferentes na web
+   - Se realmente não encontrar NADA, aí sim use "Não disponível"
 
 3. **Número de Funcionários**:
    - PRIORIDADE 1: LinkedIn da empresa (número exato de funcionários)
@@ -156,6 +167,7 @@ IMPORTANTE: Retorne a resposta em JSON válido seguindo esta estrutura:
 
 {
   "cnpj": "00.000.000/0000-00" ou "Não disponível",
+  "sector": "Setor de atuação (ex: Fintech, Varejo, Tecnologia, Indústria)",
   "estimatedRevenue": "R$ X - R$ Y" ou "Não disponível",
   "estimatedEmployees": "X-Y" ou "Não disponível",
   "location": "Cidade, UF",
@@ -216,27 +228,22 @@ ATENÇÃO: Retorne APENAS o JSON, sem texto adicional antes ou depois.`
       // Limpar CNPJ se retornado
       let cleanedCnpj: string | undefined = undefined
       if (data.cnpj && data.cnpj !== 'Não disponível' && data.cnpj !== 'N/A') {
-        cleanedCnpj = data.cnpj.replace(/\D/g, '') // Remove tudo exceto dígitos
-        if (cleanedCnpj.length !== 14) {
+        const cleaned = data.cnpj.replace(/\D/g, '') // Remove tudo exceto dígitos
+        if (cleaned.length === 14) {
+          cleanedCnpj = cleaned
+        } else {
           console.warn(`[AI Enrichment] CNPJ inválido retornado: ${data.cnpj}`)
-          cleanedCnpj = undefined
         }
       }
 
-      // Validar e retornar
+      // Validar e retornar (match CompanyEnrichmentData interface)
       return {
         cnpj: cleanedCnpj,
-        estimatedRevenue: data.estimatedRevenue || undefined,
-        estimatedEmployees: data.estimatedEmployees || undefined,
-        location: data.location || undefined,
-        recentNews: Array.isArray(data.recentNews) ? data.recentNews : [],
-        upcomingEvents: Array.isArray(data.upcomingEvents) ? data.upcomingEvents : [],
-        socialMedia: {
-          instagram: data.socialMedia?.instagram || undefined,
-          linkedin: data.socialMedia?.linkedin || undefined,
-        },
-        industryPosition: data.industryPosition || undefined,
-        keyInsights: Array.isArray(data.keyInsights) ? data.keyInsights : [],
+        revenue: data.estimatedRevenue || undefined,
+        employees: data.estimatedEmployees || undefined,
+        sector: data.sector || undefined,
+        website: data.website || undefined,
+        linkedinUrl: data.socialMedia?.linkedin?.url || undefined,
       }
     } catch (error) {
       console.error('[AI Enrichment] Erro ao parsear resposta:', error)
@@ -249,23 +256,24 @@ ATENÇÃO: Retorne APENAS o JSON, sem texto adicional antes ou depois.`
    */
   private getFallbackEnrichment(companyName: string): CompanyEnrichmentData {
     return {
-      recentNews: [],
-      upcomingEvents: [],
-      socialMedia: {},
-      keyInsights: [
-        'Enriquecimento via IA não disponível',
-        'Configure CLAUDE_API_KEY para habilitar',
-      ],
+      cnpj: undefined,
+      revenue: undefined,
+      employees: undefined,
+      sector: undefined,
+      website: undefined,
+      linkedinUrl: undefined,
     }
   }
 
   /**
    * Busca apenas informações de redes sociais (mais rápido)
+   * DEPRECATED: CompanyEnrichmentData não tem campo socialMedia
    */
+  /*
   async enrichSocialMedia(
     companyName: string,
     companyWebsite?: string
-  ): Promise<CompanyEnrichmentData['socialMedia']> {
+  ): Promise<any> {
     if (!this.client) {
       return {}
     }
@@ -311,6 +319,7 @@ Apenas o JSON, sem texto extra.`
       return {}
     }
   }
+  */
 }
 
 export const aiCompanyEnrichment = new AICompanyEnrichmentService()

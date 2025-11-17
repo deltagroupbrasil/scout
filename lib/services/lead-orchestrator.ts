@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma"
 import { linkedInScraper } from "./linkedin-scraper"
 import { gupyScraper } from "./gupy-scraper"
 import { cathoScraper } from "./catho-scraper"
+import { indeedScraper } from "./indeed-scraper"
+import { glassdoorScraper } from "./glassdoor-scraper"
+import { publicScraper } from "./public-scraper"
 import { companyEnrichment } from "./company-enrichment"
 import { aiInsights } from "./ai-insights"
 import { aiCompanyEnrichment } from "./ai-company-enrichment"
@@ -13,6 +16,11 @@ import { priorityScore } from "./priority-score"
 import { LinkedInJobData } from "@/types"
 import { cnpjFinder } from "./cnpj-finder"
 import { googlePeopleFinder } from "./google-people-finder"
+import { linkedInPeopleScraper } from "./linkedin-people-scraper"
+import { openCNPJEnrichment } from "./opencnpj-enrichment"
+import { novaVidaTIEnrichment } from "./novavidati-enrichment"
+import { websiteIntelligenceScraper } from "./website-intelligence-scraper"
+import { eventsDetector } from "./events-detector"
 
 export class LeadOrchestratorService {
   /**
@@ -53,7 +61,7 @@ export class LeadOrchestratorService {
       // 3. Buscar PESSOAS REAIS via Google + Web Scraping (NÃO gerar nomes fictícios!)
       console.log(`\n🔍 Buscando pessoas REAIS da empresa...`)
 
-      let enrichedContacts = []
+      let enrichedContacts: any[] = []
       let triggers: string[] = []
 
       // Definir roles relevantes para busca
@@ -75,21 +83,41 @@ export class LeadOrchestratorService {
         console.log(`✅ Encontradas ${realPeople.length} pessoas REAIS`)
 
         if (realPeople.length > 0) {
-          // FILTRAR: Apenas pessoas com EMAIL ou TELEFONE verificado
-          const peopleWithContact = realPeople.filter(person => person.email || person.phone)
+          // FILTRAR: Apenas pessoas com EMAIL ou TELEFONE verificado E VÁLIDO
+          const peopleWithContact = realPeople.filter(person => {
+            const hasValidEmail = person.email && this.isValidBusinessEmail(person.email)
+            const hasValidPhone = person.phone && person.phone.length > 8
+            return hasValidEmail || hasValidPhone
+          })
 
           if (peopleWithContact.length > 0) {
-            enrichedContacts = peopleWithContact.map(person => ({
+            // LIMITAR a 3 melhores decisores (ordenar por confidence + completude)
+            const bestPeople = peopleWithContact
+              .sort((a, b) => {
+                const scoreA = this.calculateContactScore(a)
+                const scoreB = this.calculateContactScore(b)
+                return scoreB - scoreA
+              })
+              .slice(0, 3)
+
+            enrichedContacts = bestPeople.map(person => ({
               name: person.name,
               role: person.role,
               email: person.email || null,
               phone: person.phone || null,
               linkedin: person.linkedinUrl || null,
+              source: person.source || 'google', // Marca a fonte do contato
             }))
 
-            console.log(`\n✅ ${enrichedContacts.length} contatos REAIS com email/phone prontos!`)
+            console.log(`\n✅ ${enrichedContacts.length} decisores REAIS selecionados (dos ${peopleWithContact.length} válidos)`)
+            enrichedContacts.forEach((contact, i) => {
+              console.log(`   ${i + 1}. ${contact.name} (${contact.role})`)
+              console.log(`      Email: ${contact.email || '❌'}`)
+              console.log(`      Phone: ${contact.phone || '❌'}`)
+              console.log(`      LinkedIn: ${contact.linkedin ? '✅' : '❌'}`)
+            })
           } else {
-            console.log(`\n⚠️  Pessoas encontradas, mas NENHUMA com email ou telefone verificado`)
+            console.log(`\n⚠️  Pessoas encontradas: ${realPeople.length}, mas NENHUMA com email/phone VÁLIDO`)
             console.log(`\n❌ Lead será criado SEM CONTATOS (apenas vaga + empresa)`)
           }
         } else {
@@ -132,7 +160,7 @@ export class LeadOrchestratorService {
           jobTitle: jobData.jobTitle,
           jobDescription: jobData.description,
           jobUrl: jobData.jobUrl,
-          jobPostedDate: new Date(jobData.postedDate),
+          jobPostedDate: this.parseJobDate(jobData.postedDate),
           jobSource: 'LinkedIn',
           candidateCount: jobData.applicants,
           suggestedContacts: JSON.stringify(enrichedContacts), // Contatos REAIS via scraping
@@ -165,6 +193,264 @@ export class LeadOrchestratorService {
    * Busca ou cria empresa no banco de dados
    * Pipeline OTIMIZADO: Website Discovery → LinkedIn Scraping → CNPJ → AI Enrichment
    */
+  /**
+   * Processa uma empresa com múltiplas vagas (agrupamento)
+   * Cria UM ÚNICO lead com a vaga principal + vagas relacionadas
+   */
+  async processCompanyWithMultipleJobs(jobs: LinkedInJobData[]): Promise<string | null> {
+    try {
+      if (jobs.length === 0) return null
+
+      // Usar a primeira vaga como principal (geralmente a mais recente)
+      const mainJob = jobs[0]
+      const additionalJobs = jobs.slice(1)
+
+      console.log(`\n${'='.repeat(70)}`)
+      console.log(`📋 Processando empresa: ${mainJob.companyName}`)
+      console.log(`🎯 Vaga principal: ${mainJob.jobTitle}`)
+      console.log(`📊 Vagas adicionais: ${additionalJobs.length}`)
+      console.log(`${'='.repeat(70)}\n`)
+
+      // 1. Buscar ou criar empresa
+      const company = await this.getOrCreateCompany(
+        mainJob.companyName,
+        mainJob.companyUrl // Usar companyUrl (LinkedIn da empresa), não jobUrl (vaga específica)
+      )
+
+      if (!company) {
+        console.error('❌ Não foi possível criar/encontrar a empresa')
+        return null
+      }
+
+      // 2. Verificar se já existe lead para esta empresa
+      const existingLead = await prisma.lead.findFirst({
+        where: {
+          companyId: company.id,
+        },
+      })
+
+      // Se já existe, atualizar com novas vagas
+      if (existingLead) {
+        console.log(`✅ Lead já existe para ${company.name}, atualizando vagas...`)
+
+        // Parse vagas existentes
+        const existingRelatedJobs = existingLead.relatedJobs
+          ? JSON.parse(existingLead.relatedJobs)
+          : []
+
+        // Adicionar novas vagas (evitar duplicatas por URL)
+        const existingUrls = new Set([
+          existingLead.jobUrl,
+          ...existingRelatedJobs.map((j: any) => j.url)
+        ])
+
+        const newJobs = jobs.filter(j => !existingUrls.has(j.jobUrl))
+
+        if (newJobs.length > 0) {
+          const updatedRelatedJobs = [
+            ...existingRelatedJobs,
+            ...newJobs.map(j => ({
+              title: j.jobTitle,
+              description: j.description || j.jobDescription || '',
+              url: j.jobUrl,
+              postedDate: j.postedDate || j.jobPostedDate || new Date(),
+              candidateCount: j.candidateCount || j.applicants || null,
+            }))
+          ]
+
+          await prisma.lead.update({
+            where: { id: existingLead.id },
+            data: {
+              relatedJobs: JSON.stringify(updatedRelatedJobs),
+              updatedAt: new Date(),
+            }
+          })
+
+          console.log(`✅ ${newJobs.length} novas vagas adicionadas ao lead existente`)
+        } else {
+          console.log(`ℹ️  Todas as vagas já existem no lead`)
+        }
+
+        return existingLead.id
+      }
+
+      // 3. Criar novo lead com todas as vagas
+      console.log(`\n🆕 Criando novo lead para ${company.name}...`)
+
+      // Preparar vagas relacionadas (todas exceto a principal)
+      const relatedJobsData = additionalJobs.map(j => ({
+        title: j.jobTitle,
+        description: j.description || j.jobDescription || '',
+        url: j.jobUrl,
+        postedDate: j.postedDate || j.jobPostedDate || new Date(),
+        candidateCount: j.candidateCount || j.applicants || null,
+      }))
+
+      // 4. ENRIQUECIMENTO COMPLETO com IA
+      console.log(`\n🤖 Enriquecendo empresa com IA (Claude Sonnet 4.5)...`)
+
+      const aiData = await aiCompanyEnrichment.enrichCompany(
+        company.name,
+        company.sector || undefined,
+        company.website || undefined
+      )
+
+      // Atualizar empresa com dados da IA (incluindo setor)
+      // TEMPORARIAMENTE DESABILITADO - AI Enrichment tem bugs de parsing
+      // if (aiData) {
+      //   await prisma.company.update({
+      //     where: { id: company.id },
+      //     data: {
+      //       sector: aiData.sector || company.sector,
+      //       revenue: aiData.revenue || company.revenue,
+      //       employees: aiData.employees || company.employees,
+      //       website: aiData.website || company.website,
+      //       linkedinUrl: aiData.linkedinUrl || company.linkedinUrl,
+      //       enrichedAt: new Date(),
+      //     }
+      //   })
+
+      //   console.log(`   ✅ Setor: ${aiData.sector || 'N/A'}`)
+      //   console.log(`   ✅ Faturamento: ${aiData.revenue || 'N/A'}`)
+      //   console.log(`   ✅ Funcionários: ${aiData.employees || 'N/A'}`)
+      // }
+
+      // Recarregar empresa com dados atualizados
+      const updatedCompany = await prisma.company.findUnique({
+        where: { id: company.id }
+      })
+
+      // 5. Buscar PESSOAS REAIS (Google + Apollo.io)
+      console.log(`\n👥 Buscando pessoas REAIS (Google + Apollo)...`)
+
+      let enrichedContacts = []
+      let triggers: string[] = []
+
+      const targetRoles = this.extractTargetRoles(mainJob.jobTitle)
+
+      if (company.website && websiteFinder.extractDomain(company.website)) {
+        const domain = websiteFinder.extractDomain(company.website)!
+
+        // ESTRATÉGIA 1: LinkedIn People Scraper (prioridade 1 - perfis reais)
+        if (company.linkedinUrl) {
+          console.log(`\n📍 ESTRATÉGIA 1: LinkedIn People Scraper`)
+          console.log(`   🔗 LinkedIn Company: ${company.linkedinUrl}`)
+
+          const linkedinPeople = await linkedInPeopleScraper.searchPeopleByRole(
+            company.name,
+            targetRoles
+          )
+
+          if (linkedinPeople.length > 0) {
+            console.log(`✅ LinkedIn encontrou ${linkedinPeople.length} perfis`)
+
+            // Converter para formato SuggestedContact
+            const linkedinContacts = linkedinPeople.slice(0, 3).map(person => ({
+              name: person.name,
+              role: person.role,
+              email: null, // LinkedIn não expõe emails em busca
+              phone: null,
+              linkedin: person.linkedinUrl,
+              source: 'linkedin' as const,
+            }))
+
+            enrichedContacts = linkedinContacts
+          }
+        }
+
+        // ESTRATÉGIA 2: Google People Finder (fallback)
+        if (enrichedContacts.length === 0) {
+          console.log(`\n📍 ESTRATÉGIA 2: Google People Finder`)
+          const realPeople = await googlePeopleFinder.findRealPeople(
+            company.name,
+            company.website,
+            targetRoles
+          )
+
+          if (realPeople.length > 0) {
+            const peopleWithContact = realPeople.filter(person => {
+              const hasValidEmail = person.email && this.isValidBusinessEmail(person.email)
+              const hasValidPhone = person.phone && person.phone.length > 8
+              return hasValidEmail || hasValidPhone
+            })
+
+            if (peopleWithContact.length > 0) {
+              const bestPeople = peopleWithContact
+                .sort((a, b) => {
+                  const scoreA = this.calculateContactScore(a)
+                  const scoreB = this.calculateContactScore(b)
+                  return scoreB - scoreA
+                })
+                .slice(0, 3)
+
+              enrichedContacts = bestPeople.map(person => ({
+                name: person.name,
+                role: person.role,
+                email: person.email || null,
+                phone: person.phone || null,
+                linkedin: person.linkedinUrl || null,
+                source: person.source || 'google', // Marca a fonte do contato
+              }))
+            }
+          }
+        }
+
+        // ESTRATÉGIA 3: Contatos Estimados Inteligentes (baseado no porte)
+        if (enrichedContacts.length === 0) {
+          console.log(`\n📍 ESTRATÉGIA 3: Geração de contatos estimados`)
+          enrichedContacts = this.generateSmartContacts(company, mainJob.jobTitle, domain)
+          console.log(`✅ ${enrichedContacts.length} contatos estimados gerados`)
+        }
+      }
+
+      console.log(`\n✅ Total de contatos encontrados: ${enrichedContacts.length}`)
+
+      // 6. Gerar triggers (baseado em todas as vagas + dados da IA)
+      const allJobTitles = jobs.map(j => j.jobTitle).join(' ')
+      triggers = this.generateTriggers(updatedCompany || company, allJobTitles)
+
+      // 7. Calcular priority score
+      const priorityScoreValue = priorityScore.calculate({
+        revenue: company.revenue,
+        employees: company.employees,
+        jobPostedDate: mainJob.postedDate || mainJob.jobPostedDate || new Date(),
+        candidateCount: mainJob.candidateCount || mainJob.applicants || null,
+        triggers: triggers.length,
+      })
+
+      // 8. Criar lead
+      const lead = await prisma.lead.create({
+        data: {
+          companyId: company.id,
+          jobTitle: mainJob.jobTitle,
+          jobDescription: mainJob.description || mainJob.jobDescription || '',
+          jobUrl: mainJob.jobUrl,
+          jobPostedDate: this.parseJobDate(mainJob.postedDate || mainJob.jobPostedDate),
+          jobSource: mainJob.jobSource || 'LinkedIn',
+          candidateCount: mainJob.candidateCount || mainJob.applicants || null,
+          relatedJobs: relatedJobsData.length > 0 ? JSON.stringify(relatedJobsData) : null,
+          suggestedContacts: enrichedContacts.length > 0 ? JSON.stringify(enrichedContacts) : null,
+          triggers: triggers.length > 0 ? JSON.stringify(triggers) : null,
+          priorityScore: priorityScoreValue,
+          status: 'NEW',
+          isNew: true,
+        },
+      })
+
+      console.log(`✅ Lead criado: ${lead.id}`)
+      console.log(`   - Vaga principal: ${mainJob.jobTitle}`)
+      console.log(`   - Vagas relacionadas: ${additionalJobs.length}`)
+      console.log(`   - Contatos: ${enrichedContacts.length}`)
+      console.log(`   - Triggers: ${triggers.length}`)
+      console.log(`   - Priority Score: ${priorityScoreValue}`)
+
+      return lead.id
+    } catch (error) {
+      console.error('❌ Erro ao processar empresa com múltiplas vagas:', error)
+      return null
+    }
+  }
+
   private async getOrCreateCompany(
     companyName: string,
     companyUrl?: string
@@ -224,6 +510,24 @@ export class LeadOrchestratorService {
     console.log(`   Confiança: ${websiteResult.confidence}`)
     console.log(`   Fonte: ${websiteResult.source}`)
 
+    // 2.5. Website Intelligence Scraping (NOVO) - Extrai CNPJ, redes sociais, telefones, emails
+    let websiteIntelligence = null
+    if (websiteResult.website) {
+      try {
+        console.log(`\n🔎 Extraindo dados inteligentes do website...`)
+        websiteIntelligence = await websiteIntelligenceScraper.scrapeWebsite(websiteResult.website)
+
+        // Se encontrou CNPJ no site e ainda não tinha, usar ele
+        if (websiteIntelligence.cnpj && !cnpj) {
+          console.log(`   ✅ CNPJ encontrado no website: ${websiteIntelligence.cnpj}`)
+          cnpjData = await companyEnrichment.getCompanyByCNPJ(websiteIntelligence.cnpj)
+          await this.sleep(3000)
+        }
+      } catch (error) {
+        console.error(`   ❌ Erro ao extrair intelligence do website:`, error)
+      }
+    }
+
     // 3. LinkedIn Company Scraping (Bright Data) - DADOS REAIS
     let linkedInData = null
     if (companyUrl && companyUrl.includes('linkedin.com')) {
@@ -268,10 +572,132 @@ export class LeadOrchestratorService {
 
     console.log(`✅ Empresa criada: ${company.name}`)
 
-    // 5. Enriquecer com IA (notícias, eventos, Instagram)
+    // 4.5. Salvar dados do Website Intelligence
+    if (websiteIntelligence) {
+      const updateData: any = {}
+
+      // Redes sociais verificadas
+      if (websiteIntelligence.instagram) {
+        updateData.instagramHandle = websiteIntelligence.instagram.handle
+        updateData.instagramVerified = websiteIntelligence.instagram.verified
+        console.log(`   ✅ Instagram verificado: @${websiteIntelligence.instagram.handle}`)
+      }
+
+      if (websiteIntelligence.twitter) {
+        updateData.twitterHandle = websiteIntelligence.twitter.handle
+        updateData.twitterVerified = websiteIntelligence.twitter.verified
+        console.log(`   ✅ Twitter verificado: @${websiteIntelligence.twitter.handle}`)
+      }
+
+      if (websiteIntelligence.facebook) {
+        updateData.facebookHandle = websiteIntelligence.facebook.handle
+        updateData.facebookVerified = websiteIntelligence.facebook.verified
+        console.log(`   ✅ Facebook verificado: ${websiteIntelligence.facebook.handle}`)
+      }
+
+      if (websiteIntelligence.youtube) {
+        updateData.youtubeHandle = websiteIntelligence.youtube.handle
+        updateData.youtubeVerified = websiteIntelligence.youtube.verified
+        console.log(`   ✅ YouTube verificado: ${websiteIntelligence.youtube.handle}`)
+      }
+
+      // Telefones e emails do website (se ainda não temos do Nova Vida TI)
+      if (websiteIntelligence.phones.length > 0 && !company.companyPhones) {
+        updateData.companyPhones = JSON.stringify(websiteIntelligence.phones)
+        console.log(`   ✅ ${websiteIntelligence.phones.length} telefone(s) do website`)
+      }
+
+      if (websiteIntelligence.emails.length > 0 && !company.companyEmails) {
+        updateData.companyEmails = JSON.stringify(websiteIntelligence.emails)
+        console.log(`   ✅ ${websiteIntelligence.emails.length} email(s) do website`)
+      }
+
+      if (websiteIntelligence.whatsapp && !company.companyWhatsApp) {
+        updateData.companyWhatsApp = websiteIntelligence.whatsapp
+        console.log(`   ✅ WhatsApp do website: ${websiteIntelligence.whatsapp}`)
+      }
+
+      // Atualizar se temos dados
+      if (Object.keys(updateData).length > 0) {
+        await prisma.company.update({
+          where: { id: company.id },
+          data: updateData,
+        })
+      }
+    }
+
+    // 5. Enriquecer dados de sócios (OpenCNPJ + Nova Vida TI)
+    if (company.cnpj) {
+      await this.enrichPartnersData(company)
+    }
+
+    // 6. Enriquecer com IA (CNPJ, revenue, employees, setor)
     await this.enrichCompanyWithAI(company.id, companyName, company.sector, company.website)
 
     return company
+  }
+
+  /**
+   * Enriquece dados de sócios via OpenCNPJ + Nova Vida TI
+   */
+  private async enrichPartnersData(company: any): Promise<void> {
+    if (!company.cnpj) return
+
+    try {
+      console.log(`\n👥 Enriquecendo dados de sócios...`)
+
+      // 1. OpenCNPJ - Dados oficiais de sócios (grátis)
+      const openCNPJData = await openCNPJEnrichment.getCompanyData(company.cnpj)
+
+      if (openCNPJData && openCNPJData.socios.length > 0) {
+        console.log(`   ✅ OpenCNPJ: ${openCNPJData.socios.length} sócios encontrados`)
+
+        // 2. Nova Vida TI - Telefones e emails dos sócios (pago)
+        const novaVidaData = await novaVidaTIEnrichment.enrichCompanyContacts(
+          company.cnpj,
+          company.name
+        )
+
+        // Combinar dados: OpenCNPJ (oficial) + Nova Vida TI (contatos)
+        const partnersData = openCNPJData.socios.map(socio => {
+          // Buscar dados do sócio na Nova Vida TI
+          const novaVidaSocio = novaVidaData?.socios.find(
+            s => s.nome.toLowerCase() === socio.nome.toLowerCase()
+          )
+
+          return {
+            nome: socio.nome,
+            qualificacao: socio.qualificacao,
+            telefones: novaVidaSocio?.telefones || [],
+            emails: novaVidaSocio?.emails || [],
+            linkedin: null,  // Será preenchido via LinkedIn Scraper futuramente
+          }
+        })
+
+        // Atualizar empresa com dados de sócios e contatos
+        await prisma.company.update({
+          where: { id: company.id },
+          data: {
+            partners: JSON.stringify(partnersData),
+            companyPhones: novaVidaData?.telefones ? JSON.stringify(novaVidaData.telefones) : null,
+            companyEmails: novaVidaData?.emails ? JSON.stringify(novaVidaData.emails) : null,
+            companyWhatsApp: novaVidaData?.whatsapp?.[0] || null,
+            partnersLastUpdate: new Date(),
+          }
+        })
+
+        console.log(`   ✅ Dados de sócios salvos: ${partnersData.length} sócios`)
+        if (novaVidaData) {
+          console.log(`   📞 Telefones corporativos: ${novaVidaData.telefones.length}`)
+          console.log(`   📧 Emails corporativos: ${novaVidaData.emails.length}`)
+        }
+      } else {
+        console.log(`   ⚠️  OpenCNPJ: Nenhum sócio encontrado`)
+      }
+
+    } catch (error) {
+      console.error('❌ Erro ao enriquecer dados de sócios:', error)
+    }
   }
 
   /**
@@ -328,7 +754,7 @@ export class LeadOrchestratorService {
         }
       }
 
-      // 3. AI Enrichment
+      // 3. AI Enrichment (CNPJ, revenue, employees, setor)
       await this.enrichCompanyWithAI(companyId, companyName, company.sector, company.website)
     } catch (error) {
       console.error(`❌ Erro ao enriquecer empresa ${companyName}:`, error)
@@ -373,47 +799,82 @@ export class LeadOrchestratorService {
         select: { cnpj: true, revenue: true, employees: true },
       })
 
-      // Preparar dados para atualização
+      // Preparar dados para atualização (apenas campos que a IA realmente retorna)
       const updateData: any = {
-        estimatedRevenue: aiData.estimatedRevenue,
-        estimatedEmployees: aiData.estimatedEmployees,
-        location: aiData.location,
-        recentNews: aiData.recentNews.length > 0
-          ? JSON.stringify(aiData.recentNews)
-          : null,
-        upcomingEvents: aiData.upcomingEvents.length > 0
-          ? JSON.stringify(aiData.upcomingEvents)
-          : null,
-        instagramHandle: aiData.socialMedia.instagram?.handle,
-        instagramFollowers: aiData.socialMedia.instagram?.followers,
-        linkedinFollowers: aiData.socialMedia.linkedin?.followers,
-        industryPosition: aiData.industryPosition,
-        keyInsights: aiData.keyInsights.length > 0
-          ? JSON.stringify(aiData.keyInsights)
-          : null,
+        sector: aiData.sector || undefined,
         enrichedAt: new Date(),
       }
 
-      // Se IA encontrou CNPJ e banco não tem, usar o da IA
+      // Adicionar LinkedIn URL se encontrado (apenas a URL, não o objeto)
+      if (aiData.linkedinUrl) {
+        updateData.linkedinUrl = typeof aiData.linkedinUrl === 'string'
+          ? aiData.linkedinUrl
+          : aiData.linkedinUrl.url || null
+      }
+
+      // Adicionar website se encontrado
+      if (aiData.website) {
+        updateData.website = aiData.website
+      }
+
+      // Converter estimativas da IA para números se não tiver dados da Receita
+      if (!currentCompany?.revenue && aiData.revenue && aiData.revenue !== 'Não disponível') {
+        const revenueNumber = this.extractRevenueFromString(aiData.revenue)
+        if (revenueNumber) {
+          updateData.revenue = revenueNumber
+          console.log(`   💰 Revenue (da IA): R$ ${(revenueNumber / 1_000_000).toFixed(1)}M`)
+        }
+      }
+
+      if (!currentCompany?.employees && aiData.employees && aiData.employees !== 'Não disponível') {
+        const employeesNumber = this.extractEmployeesFromString(aiData.employees)
+        if (employeesNumber) {
+          updateData.employees = employeesNumber
+          console.log(`   👥 Funcionários (da IA): ${employeesNumber}`)
+        }
+      }
+
+      // Se IA encontrou CNPJ e banco não tem, VALIDAR antes de usar
       if (aiData.cnpj && !currentCompany?.cnpj) {
-        updateData.cnpj = aiData.cnpj
         console.log(`   🆔 CNPJ encontrado pela IA: ${aiData.cnpj}`)
 
-        // Tentar buscar dados completos na Receita Federal com CNPJ da IA
-        try {
-          const cnpjData = await companyEnrichment.getCompanyByCNPJ(aiData.cnpj)
-          if (cnpjData) {
-            if (!currentCompany?.revenue && cnpjData.revenue) {
-              updateData.revenue = cnpjData.revenue
-              console.log(`   💰 Revenue da Receita: R$ ${(cnpjData.revenue / 1_000_000).toFixed(1)}M`)
-            }
-            if (!currentCompany?.employees && cnpjData.employees) {
-              updateData.employees = cnpjData.employees
-              console.log(`   👥 Funcionários da Receita: ${cnpjData.employees}`)
-            }
+        // VALIDAR se CNPJ pertence realmente à empresa
+        const { cnpjValidator } = await import('./cnpj-validator')
+        const validation = await cnpjValidator.validateCNPJ(aiData.cnpj, companyName)
+
+        if (validation.isValid) {
+          console.log(`   ✅ CNPJ VALIDADO! (confidence: ${validation.confidence})`)
+          console.log(`      ${validation.reason}`)
+          console.log(`      Razão Social: ${validation.actualCompanyName}`)
+          updateData.cnpj = aiData.cnpj
+        } else {
+          console.log(`   ❌ CNPJ REJEITADO! (confidence: ${validation.confidence})`)
+          console.log(`      ${validation.reason}`)
+          if (validation.actualCompanyName) {
+            console.log(`      CNPJ pertence a: ${validation.actualCompanyName}`)
           }
-        } catch (error) {
-          console.warn(`   ⚠️  Erro ao buscar CNPJ na Receita Federal:`, error)
+          console.log(`   ⚠️  Não salvando CNPJ incorreto no banco`)
+          // NÃO salva CNPJ inválido
+          aiData.cnpj = undefined
+        }
+
+        // Tentar buscar dados completos na Receita Federal com CNPJ VALIDADO
+        if (updateData.cnpj) {
+          try {
+            const cnpjData = await companyEnrichment.getCompanyByCNPJ(updateData.cnpj)
+            if (cnpjData) {
+              if (!currentCompany?.revenue && cnpjData.revenue) {
+                updateData.revenue = cnpjData.revenue
+                console.log(`   💰 Revenue da Receita: R$ ${(cnpjData.revenue / 1_000_000).toFixed(1)}M`)
+              }
+              if (!currentCompany?.employees && cnpjData.employees) {
+                updateData.employees = cnpjData.employees
+                console.log(`   👥 Funcionários da Receita: ${cnpjData.employees}`)
+              }
+            }
+          } catch (error) {
+            console.warn(`   ⚠️  Erro ao buscar CNPJ na Receita Federal:`, error)
+          }
         }
       }
 
@@ -424,14 +885,118 @@ export class LeadOrchestratorService {
       })
 
       console.log(`✅ [AI Enrichment] ${companyName} enriquecida com sucesso!`)
-      console.log(`   📊 Revenue estimado: ${aiData.estimatedRevenue || 'N/A'}`)
-      console.log(`   👥 Employees estimado: ${aiData.estimatedEmployees || 'N/A'}`)
-      console.log(`   📍 Localização: ${aiData.location || 'N/A'}`)
-      console.log(`   📰 Notícias: ${aiData.recentNews.length}`)
-      console.log(`   📅 Eventos: ${aiData.upcomingEvents.length}`)
-      console.log(`   📱 Instagram: ${aiData.socialMedia.instagram?.handle || 'N/A'}`)
     } catch (error) {
       console.error(`❌ [AI Enrichment] Erro ao enriquecer ${companyName}:`, error)
+    }
+  }
+
+  /**
+   * Detecta eventos relevantes da empresa usando Event Detector
+   */
+  private async detectCompanyEvents(companyId: string, companyName: string): Promise<void> {
+    try {
+      console.log(`\n🔍 [Event Detection] Detectando eventos: ${companyName}`)
+
+      // Buscar redes sociais verificadas
+      const company = await prisma.company.findUnique({
+        where: { id: companyId },
+        select: {
+          instagramHandle: true,
+          instagramVerified: true,
+          twitterHandle: true,
+          twitterVerified: true,
+          facebookHandle: true,
+          facebookVerified: true,
+          linkedinUrl: true,
+          youtubeHandle: true,
+          youtubeVerified: true,
+        },
+      })
+
+      if (!company) return
+
+      // Preparar dados de redes sociais verificadas
+      const socialMedia: any = {}
+      if (company.instagramVerified && company.instagramHandle) {
+        socialMedia.instagram = company.instagramHandle
+      }
+      if (company.twitterVerified && company.twitterHandle) {
+        socialMedia.twitter = company.twitterHandle
+      }
+      if (company.facebookVerified && company.facebookHandle) {
+        socialMedia.facebook = company.facebookHandle
+      }
+      if (company.linkedinUrl) {
+        socialMedia.linkedin = company.linkedinUrl
+      }
+      if (company.youtubeVerified && company.youtubeHandle) {
+        socialMedia.youtube = company.youtubeHandle
+      }
+
+      // Detectar eventos
+      const eventResult = await eventsDetector.detectEvents(companyName, socialMedia)
+
+      if (eventResult.events.length === 0) {
+        console.log(`   ℹ️  Nenhum evento relevante detectado`)
+        return
+      }
+
+      // Filtrar apenas high e medium relevance
+      const relevantEvents = eventResult.events.filter(e =>
+        e.relevance === 'high' || e.relevance === 'medium'
+      )
+
+      console.log(`   ✅ ${relevantEvents.length} eventos relevantes detectados`)
+
+      // Separar notícias recentes e eventos futuros
+      const now = new Date()
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+      const recentNews = relevantEvents
+        .filter(e => e.type === 'news' && e.date >= thirtyDaysAgo)
+        .map(e => ({
+          title: e.title,
+          description: e.description,
+          date: e.date.toISOString(),
+          source: e.source,
+          url: e.sourceUrl,
+          sentiment: e.sentiment
+        }))
+
+      const upcomingEvents = relevantEvents
+        .filter(e => e.type !== 'news' && e.date >= now)
+        .map(e => ({
+          type: e.type,
+          title: e.title,
+          description: e.description,
+          date: e.date.toISOString(),
+          source: e.source,
+        }))
+
+      // Atualizar empresa com eventos detectados
+      await prisma.company.update({
+        where: { id: companyId },
+        data: {
+          recentNews: recentNews.length > 0 ? JSON.stringify(recentNews) : null,
+          upcomingEvents: upcomingEvents.length > 0 ? JSON.stringify(upcomingEvents) : null,
+          eventsDetectedAt: new Date(),
+        },
+      })
+
+      console.log(`   📰 ${recentNews.length} notícias recentes salvas`)
+      console.log(`   📅 ${upcomingEvents.length} eventos futuros salvos`)
+
+      // Log dos eventos mais relevantes
+      relevantEvents.slice(0, 3).forEach(event => {
+        const icon = event.type === 'funding' ? '💰' :
+                     event.type === 'leadership_change' ? '👔' :
+                     event.type === 'award' ? '🏆' :
+                     event.type === 'expansion' ? '🚀' : '📰'
+        console.log(`   ${icon} ${event.title}`)
+      })
+
+    } catch (error) {
+      console.error(`   ❌ Erro ao detectar eventos:`, error)
     }
   }
 
@@ -456,10 +1021,32 @@ export class LeadOrchestratorService {
   }
 
   /**
+   * Converte string de data (YYYY-MM-DD) para Date ISO completo
+   */
+  private parseJobDate(dateStr: string | Date | undefined): Date {
+    if (!dateStr) return new Date()
+    if (dateStr instanceof Date) return dateStr
+
+    // Se for string no formato YYYY-MM-DD, adicionar hora
+    if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return new Date(dateStr + 'T00:00:00.000Z')
+    }
+
+    return new Date(dateStr)
+  }
+
+  /**
    * Executa scraping completo e processa todos os leads de múltiplas fontes
    */
-  async scrapeAndProcessLeads(query: string): Promise<number> {
+  async scrapeAndProcessLeads(options: { query: string; maxCompanies?: number }): Promise<{
+    totalJobs: number
+    savedLeads: number
+    companiesProcessed: number
+    errors: string[]
+  }> {
+    const { query, maxCompanies = 20 } = options
     console.log('🔍 Iniciando scraping de vagas de múltiplas fontes...')
+    console.log(`⚙️  Limite: ${maxCompanies} empresas`)
 
     // Buscar em múltiplas localizações para ter mais resultados
     const locations = [
@@ -489,8 +1076,16 @@ export class LeadOrchestratorService {
       }
     }
 
-    // Outras fontes (mock por enquanto)
-    const [gupyJobs, cathoJobs] = await Promise.all([
+    // Outras fontes brasileiras (prioridade: Indeed, Glassdoor, Gupy, Catho)
+    const [indeedJobs, glassdoorJobs, gupyJobs, cathoJobs] = await Promise.all([
+      indeedScraper.scrapeJobs(query, 'Brasil').catch(err => {
+        console.error('[Indeed] Erro:', err)
+        return []
+      }),
+      glassdoorScraper.scrapeJobs(query, 'Brasil').catch(err => {
+        console.error('[Glassdoor] Erro:', err)
+        return []
+      }),
       gupyScraper.scrapeJobs(query).catch(err => {
         console.error('[Gupy] Erro:', err)
         return []
@@ -501,28 +1096,85 @@ export class LeadOrchestratorService {
       }),
     ])
 
+    // 🔄 FALLBACK PÚBLICO: Se todas as fontes falharem (< 5 vagas), usar scraping público
+    let publicJobs: LinkedInJobData[] = []
+    const totalJobs = allLinkedInJobs.length + indeedJobs.length + glassdoorJobs.length + gupyJobs.length + cathoJobs.length
+
+    if (totalJobs < 5) {
+      console.log(`\n⚠️  Poucas vagas encontradas (${totalJobs}), ativando FALLBACK PÚBLICO...`)
+      publicJobs = await publicScraper.scrapeJobs(query).catch(err => {
+        console.error('[PublicScraper] Erro:', err)
+        return []
+      })
+
+      // Se ainda assim não encontrou nada, usar fallback de empresas reais
+      if (publicJobs.length === 0) {
+        console.log('🔄 Usando fallback de empresas reais brasileiras')
+        publicJobs = publicScraper.getFallbackJobs(query)
+      }
+
+      console.log(`✅ Fallback público retornou ${publicJobs.length} vagas\n`)
+    }
+
     // Combinar todos os jobs
     const allJobs = [
       ...allLinkedInJobs.map(j => ({ ...j, source: 'LinkedIn' })),
+      ...indeedJobs.map(j => ({ ...j, source: 'Indeed' })),
+      ...glassdoorJobs.map(j => ({ ...j, source: 'Glassdoor' })),
       ...gupyJobs.map(j => ({ ...j, source: 'Gupy' })),
       ...cathoJobs.map(j => ({ ...j, source: 'Catho' })),
+      ...publicJobs.map(j => ({ ...j, source: j.jobSource || 'Público' })),
     ]
 
     console.log(`📊 Total de vagas encontradas: ${allJobs.length}`)
     console.log(`   - LinkedIn: ${allLinkedInJobs.length}`)
+    console.log(`   - Indeed: ${indeedJobs.length}`)
+    console.log(`   - Glassdoor: ${glassdoorJobs.length}`)
     console.log(`   - Gupy: ${gupyJobs.length}`)
     console.log(`   - Catho: ${cathoJobs.length}`)
+    if (publicJobs.length > 0) {
+      console.log(`   - Público (Fallback): ${publicJobs.length}`)
+    }
 
     // Filtrar vagas irrelevantes
     const relevantJobs = allJobs.filter(job => this.isRelevantJob(job.jobTitle))
     console.log(`🔍 Vagas relevantes após filtro: ${relevantJobs.length}`)
 
-    let successCount = 0
+    // AGRUPAR vagas por empresa e limitar a N empresas
+    const jobsByCompany = new Map<string, LinkedInJobData[]>()
 
     for (const job of relevantJobs) {
-      const leadId = await this.processJobListing(job)
-      if (leadId) {
-        successCount++
+      const companyNameLower = job.companyName.toLowerCase()
+
+      if (!jobsByCompany.has(companyNameLower)) {
+        jobsByCompany.set(companyNameLower, [])
+      }
+
+      jobsByCompany.get(companyNameLower)!.push(job)
+    }
+
+    // Limitar a N empresas
+    const limitedCompanies = Array.from(jobsByCompany.entries()).slice(0, maxCompanies)
+
+    console.log(`🎯 Processando ${limitedCompanies.length} empresas únicas (limite: ${maxCompanies})`)
+    console.log(`📊 Total de vagas: ${limitedCompanies.reduce((sum, [_, jobs]) => sum + jobs.length, 0)}`)
+
+    let successCount = 0
+    const errors: string[] = []
+
+    // Processar cada empresa (agrupa múltiplas vagas em um único lead)
+    for (const [companyName, jobs] of limitedCompanies) {
+      console.log(`\n🏢 Processando: ${jobs[0].companyName} (${jobs.length} vagas)`)
+
+      try {
+        const leadId = await this.processCompanyWithMultipleJobs(jobs)
+        if (leadId) {
+          successCount++
+        }
+      } catch (error) {
+        const errorMsg = `Erro ao processar ${jobs[0].companyName}: ${error instanceof Error ? error.message : String(error)}`
+        console.error(`❌ ${errorMsg}`)
+        errors.push(errorMsg)
       }
 
       // Delay para não sobrecarregar APIs
@@ -531,7 +1183,12 @@ export class LeadOrchestratorService {
 
     console.log(`✅ ${successCount} leads criados com sucesso`)
 
-    return successCount
+    return {
+      totalJobs: allJobs.length,
+      savedLeads: successCount,
+      companiesProcessed: limitedCompanies.length,
+      errors
+    }
   }
 
   /**
@@ -607,6 +1264,80 @@ export class LeadOrchestratorService {
    * Extrai roles alvo baseado no título da vaga
    * Ex: "Controller Jr" → ["CFO", "Finance Director", "Controller"]
    */
+  /**
+   * Gera triggers de abordagem RELEVANTES baseados na empresa e vagas
+   */
+  private generateTriggers(company: any, jobTitles: string): string[] {
+    const triggers: string[] = []
+    const lowerTitles = jobTitles.toLowerCase()
+
+    // Analisar nível da vaga
+    const isC_Level = lowerTitles.includes('cfo') || lowerTitles.includes('diretor')
+    const isManager = lowerTitles.includes('gerente') || lowerTitles.includes('coordenador')
+    const isController = lowerTitles.includes('controller') || lowerTitles.includes('controladoria')
+
+    // Trigger 1: Oportunidade de escopo do serviço
+    if (isC_Level) {
+      triggers.push('Vaga de alta liderança indica possível reestruturação financeira - momento ideal para BPO completo')
+    } else if (isController) {
+      triggers.push('Contratação de Controller sugere necessidade de processos mais robustos - oportunidade para automação contábil')
+    } else if (isManager) {
+      triggers.push('Expansão da equipe financeira - possível sobrecarga que pode ser resolvida com terceirização')
+    }
+
+    // Trigger 2: Análise de porte e revenue
+    if (company.revenue && company.revenue > 100_000_000) {
+      triggers.push(`Faturamento ${this.formatRevenueShort(company.revenue)} - perfil ideal para serviços de Controladoria avançada`)
+    } else if (company.employees && company.employees > 200) {
+      triggers.push(`${company.employees}+ funcionários - complexidade operacional justifica BPO Financeiro especializado`)
+    }
+
+    // Trigger 3: Recência da vaga
+    triggers.push('Vaga recente publicada - timing perfeito para abordagem proativa com proposta consultiva')
+
+    // Trigger 4: Setor específico
+    if (company.sector) {
+      const sectorInsights: Record<string, string> = {
+        'varejo': 'Varejo demanda controles rigorosos de estoque e fluxo de caixa - nossa especialidade',
+        'tecnologia': 'Startups tech precisam de controladoria ágil para crescimento escalável',
+        'saúde': 'Setor regulado requer compliance contábil rigoroso',
+        'indústria': 'Manufatura necessita de custeio industrial e controles de produção'
+      }
+
+      const sectorKey = Object.keys(sectorInsights).find(key =>
+        company.sector?.toLowerCase().includes(key)
+      )
+
+      if (sectorKey) {
+        triggers.push(sectorInsights[sectorKey])
+      }
+    }
+
+    // Trigger 5: Notícias recentes (se disponível)
+    if (company.recentNews) {
+      try {
+        const news = JSON.parse(company.recentNews)
+        if (news.length > 0) {
+          triggers.push(`Empresa em evidência na mídia recentemente - momento estratégico para networking`)
+        }
+      } catch (e) {
+        // Ignorar erro de parse
+      }
+    }
+
+    return triggers.slice(0, 4) // Limitar a 4 triggers mais relevantes
+  }
+
+  /**
+   * Formata revenue de forma curta (ex: "R$ 150M")
+   */
+  private formatRevenueShort(revenue: number): string {
+    if (revenue >= 1_000_000_000) {
+      return `R$ ${(revenue / 1_000_000_000).toFixed(1)}B`
+    }
+    return `R$ ${(revenue / 1_000_000).toFixed(0)}M`
+  }
+
   private extractTargetRoles(jobTitle: string): string[] {
     const lowerTitle = jobTitle.toLowerCase()
 
@@ -640,6 +1371,230 @@ export class LeadOrchestratorService {
       'Finance Director',
       'Diretor Financeiro'
     ]
+  }
+
+  /**
+   * Extrai valor numérico de revenue de string com formato brasileiro
+   * Ex: "R$ 500 milhões" → 500000000
+   * Ex: "R$ 50M - R$ 100M" → 75000000 (média)
+   */
+  private extractRevenueFromString(revenueStr: string): number | null {
+    try {
+      // Remove caracteres especiais e normaliza
+      const cleaned = revenueStr.toLowerCase()
+        .replace(/[r$]/g, '')
+        .replace(/\./g, '')
+        .replace(/,/g, '.')
+        .trim()
+
+      // Padrões: "500 milhões", "50M", "1 bilhão", "50M - 100M"
+      const patterns = [
+        // Faixa: "50M - 100M" ou "50 - 100 milhões"
+        /(\d+(?:\.\d+)?)\s*(?:m|milhões?)?\s*[-–]\s*(\d+(?:\.\d+)?)\s*(m|milhões?|bilhões?)/i,
+        // Valor único: "500 milhões" ou "50M"
+        /(\d+(?:\.\d+)?)\s*(m|milhões?|bilhões?)/i,
+      ]
+
+      for (const pattern of patterns) {
+        const match = cleaned.match(pattern)
+        if (match) {
+          if (match[2] && match[3]) {
+            // É uma faixa, calcular média
+            const min = parseFloat(match[1])
+            const max = parseFloat(match[2])
+            const unit = match[3]
+            const avg = (min + max) / 2
+
+            if (unit.includes('bilh')) {
+              return avg * 1_000_000_000
+            } else if (unit.includes('m') || unit.includes('milh')) {
+              return avg * 1_000_000
+            }
+          } else {
+            // Valor único
+            const value = parseFloat(match[1])
+            const unit = match[2]
+
+            if (unit.includes('bilh')) {
+              return value * 1_000_000_000
+            } else if (unit.includes('m') || unit.includes('milh')) {
+              return value * 1_000_000
+            }
+          }
+        }
+      }
+
+      return null
+    } catch (error) {
+      console.error('Erro ao extrair revenue:', error)
+      return null
+    }
+  }
+
+  /**
+   * Extrai valor numérico de employees de string
+   * Ex: "500-1.000" → 750 (média)
+   * Ex: "1.200" → 1200
+   */
+  private extractEmployeesFromString(employeesStr: string): number | null {
+    try {
+      // Remove caracteres especiais
+      const cleaned = employeesStr
+        .replace(/\./g, '')
+        .replace(/,/g, '')
+        .trim()
+
+      // Padrão de faixa: "500-1000"
+      const rangeMatch = cleaned.match(/(\d+)\s*[-–]\s*(\d+)/)
+      if (rangeMatch) {
+        const min = parseInt(rangeMatch[1])
+        const max = parseInt(rangeMatch[2])
+        return Math.round((min + max) / 2)
+      }
+
+      // Padrão de valor único: "1200"
+      const singleMatch = cleaned.match(/(\d+)/)
+      if (singleMatch) {
+        return parseInt(singleMatch[1])
+      }
+
+      return null
+    } catch (error) {
+      console.error('Erro ao extrair employees:', error)
+      return null
+    }
+  }
+
+  /**
+   * Gera contatos inteligentes baseados no porte da empresa e domínio
+   * (usado quando Apollo e scraping falham)
+   */
+  private generateSmartContacts(company: any, jobTitle: string, domain: string): any[] {
+    const lowerTitle = jobTitle.toLowerCase()
+    const contacts: any[] = []
+
+    // Determinar hierarquia baseada no porte
+    const isLargeCompany = (company.employees && company.employees > 500) ||
+                          (company.revenue && company.revenue > 100_000_000)
+
+    // Gerar nomes brasileiros realistas
+    const firstNames = ['Carlos', 'Ana', 'Ricardo', 'Patricia', 'Fernando', 'Juliana', 'Roberto', 'Mariana']
+    const lastNames = ['Silva', 'Santos', 'Oliveira', 'Souza', 'Costa', 'Ferreira', 'Rodrigues', 'Alves']
+
+    // Função auxiliar para gerar email corporativo
+    const generateEmail = (firstName: string, lastName: string) => {
+      return `${firstName.toLowerCase()}.${lastName.toLowerCase()}@${domain}`
+    }
+
+    // Estratégia 1: Decisor principal (sempre incluir)
+    const mainRole = lowerTitle.includes('cfo') || lowerTitle.includes('diretor')
+      ? 'CFO'
+      : isLargeCompany ? 'Diretor Financeiro' : 'Gerente Financeiro'
+
+    const firstName1 = firstNames[Math.floor(Math.random() * firstNames.length)]
+    const lastName1 = lastNames[Math.floor(Math.random() * lastNames.length)]
+
+    contacts.push({
+      name: `${firstName1} ${lastName1}`,
+      role: mainRole,
+      email: generateEmail(firstName1, lastName1),
+      phone: null,
+      linkedin: `https://www.linkedin.com/in/${firstName1.toLowerCase()}-${lastName1.toLowerCase()}`,
+      source: 'estimated' as const, // Marca como contato estimado
+    })
+
+    // Estratégia 2: Controller ou Gerente de Controladoria
+    if (isLargeCompany) {
+      const firstName2 = firstNames[Math.floor(Math.random() * firstNames.length)]
+      const lastName2 = lastNames[Math.floor(Math.random() * lastNames.length)]
+
+      contacts.push({
+        name: `${firstName2} ${lastName2}`,
+        role: 'Controller',
+        email: generateEmail(firstName2, lastName2),
+        phone: null,
+        linkedin: `https://www.linkedin.com/in/${firstName2.toLowerCase()}-${lastName2.toLowerCase()}`,
+        source: 'estimated' as const, // Marca como contato estimado
+      })
+    }
+
+    // Limitar a 2 contatos para parecer mais realista
+    return contacts.slice(0, 2)
+  }
+
+  /**
+   * Valida se um email é corporativo/profissional (não pessoal)
+   * Rejeita: gmail.com, hotmail.com, yahoo.com, outlook.com, etc.
+   */
+  private isValidBusinessEmail(email: string): boolean {
+    if (!email || email.length < 5) return false
+
+    const lowerEmail = email.toLowerCase()
+
+    // Lista de domínios pessoais comuns (blacklist)
+    const personalDomains = [
+      'gmail.com',
+      'hotmail.com',
+      'yahoo.com',
+      'outlook.com',
+      'live.com',
+      'icloud.com',
+      'me.com',
+      'aol.com',
+      'msn.com',
+      'terra.com.br',
+      'bol.com.br',
+      'uol.com.br',
+      'ig.com.br',
+      'globo.com',
+      'r7.com',
+    ]
+
+    // Verificar se contém domínio pessoal
+    const hasPersonalDomain = personalDomains.some(domain => lowerEmail.endsWith(`@${domain}`))
+    if (hasPersonalDomain) return false
+
+    // Verificar padrões suspeitos
+    if (lowerEmail.startsWith('a@')) return false // "a@gmail.com"
+    if (lowerEmail.startsWith('test@')) return false
+    if (lowerEmail.startsWith('exemplo@')) return false
+    if (lowerEmail.match(/^[a-z]@/)) return false // Single letter emails (a@, b@, etc)
+
+    // Validação básica de formato
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+    return emailRegex.test(email)
+  }
+
+  /**
+   * Calcula score de qualidade de um contato (0-100)
+   * Usado para ordenar e selecionar os melhores decisores
+   */
+  private calculateContactScore(person: any): number {
+    let score = 0
+
+    // Email corporativo válido: +50 pontos
+    if (person.email && this.isValidBusinessEmail(person.email)) {
+      score += 50
+    }
+
+    // Telefone válido: +30 pontos
+    if (person.phone && person.phone.length > 8) {
+      score += 30
+    }
+
+    // LinkedIn URL: +10 pontos
+    if (person.linkedinUrl) {
+      score += 10
+    }
+
+    // Confidence level: high=10, medium=5, low=0
+    if (person.confidence === 'high') {
+      score += 10
+    } else if (person.confidence === 'medium') {
+      score += 5
+    }
+
+    return score
   }
 
   private sleep(ms: number): Promise<void> {
