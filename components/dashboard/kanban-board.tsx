@@ -34,9 +34,6 @@ interface Company {
   location?: string | null
   website?: string | null
   linkedinUrl?: string | null
-  companyPhones?: string | null
-  companyEmails?: string | null
-  companyWhatsApp?: string | null
 }
 
 interface Lead {
@@ -180,12 +177,9 @@ export default function KanbanBoard({ initialLeads, users, currentUserId, showAl
   }
 
   const getContactInfo = (company: Company) => {
-    const phones = company.companyPhones ? JSON.parse(company.companyPhones) : []
-    const emails = company.companyEmails ? JSON.parse(company.companyEmails) : []
-
     return {
-      phone: phones[0] || company.companyWhatsApp || null,
-      email: emails[0] || null,
+      phone: null,
+      email: null,
     }
   }
 

@@ -200,10 +200,9 @@ export class SerpApiService {
         companyName,
         location,
         description: snippet,
-        postedDate: new Date().toISOString(),
+        postedDate: new Date(),
         jobUrl: url,
         applicants: 0,
-        cnpj: null,
       }
     } catch (error) {
       console.error('Erro ao parsear resultado SERP:', error)

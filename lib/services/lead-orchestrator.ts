@@ -237,7 +237,7 @@ export class LeadOrchestratorService {
 
         // Parse vagas existentes
         const existingRelatedJobs = existingLead.relatedJobs
-          ? JSON.parse(existingLead.relatedJobs)
+          ? JSON.parse(typeof existingLead.relatedJobs === 'string' ? existingLead.relatedJobs : JSON.stringify(existingLead.relatedJobs))
           : []
 
         // Adicionar novas vagas (evitar duplicatas por URL)
@@ -325,7 +325,7 @@ export class LeadOrchestratorService {
       // 5. Buscar PESSOAS REAIS (Google + Apollo.io)
       console.log(`\n Buscando pessoas REAIS (Google + Apollo)...`)
 
-      let enrichedContacts = []
+      let enrichedContacts: any[] = []
       let triggers: string[] = []
 
       const targetRoles = this.extractTargetRoles(mainJob.jobTitle)
@@ -434,9 +434,9 @@ export class LeadOrchestratorService {
           jobPostedDate: this.parseJobDate(mainJob.postedDate || mainJob.jobPostedDate),
           jobSource: mainJob.jobSource || 'LinkedIn',
           candidateCount: mainJob.candidateCount || mainJob.applicants || null,
-          relatedJobs: relatedJobsData.length > 0 ? JSON.stringify(relatedJobsData) : null,
-          suggestedContacts: enrichedContacts.length > 0 ? JSON.stringify(enrichedContacts) : null,
-          triggers: triggers.length > 0 ? JSON.stringify(triggers) : null,
+          ...(relatedJobsData.length > 0 && { relatedJobs: JSON.stringify(relatedJobsData) }),
+          ...(enrichedContacts.length > 0 && { suggestedContacts: JSON.stringify(enrichedContacts) }),
+          ...(triggers.length > 0 && { triggers: JSON.stringify(triggers) }),
           priorityScore: priorityScoreValue,
           status: 'NEW',
           isNew: true,
@@ -512,7 +512,7 @@ export class LeadOrchestratorService {
       websiteResult.website || undefined
     )
 
-    let cnpjData = null
+    let cnpjData: any = null
     if (cnpj) {
       console.log(`    CNPJ encontrado: ${this.formatCNPJ(cnpj)}`)
       cnpjData = await companyEnrichment.getCompanyByCNPJ(cnpj)
@@ -522,7 +522,7 @@ export class LeadOrchestratorService {
     }
 
     // 2.5. Website Intelligence Scraping (NOVO) - Extrai CNPJ, redes sociais, telefones, emails
-    let websiteIntelligence = null
+    let websiteIntelligence: any = null
     if (websiteResult.website) {
       try {
         console.log(`\n🔎 Extraindo dados inteligentes do website...`)
@@ -541,10 +541,10 @@ export class LeadOrchestratorService {
 
     // 2.6. Social Media Discovery - TEMPORARIAMENTE DESABILITADO (encoding issues)
     // TODO: Recriar social-media-finder.ts com encoding UTF-8 correto
-    let socialMediaProfiles = null
+    let socialMediaProfiles: any = null
 
     // 3. LinkedIn Company Scraping (Bright Data) - DADOS REAIS
-    let linkedInData = null
+    let linkedInData: any = null
     if (companyUrl && companyUrl.includes('linkedin.com')) {
       try {
         console.log(`\n Scraping LinkedIn Company Page...`)
@@ -732,9 +732,9 @@ export class LeadOrchestratorService {
         where: { id: company.id },
         data: {
           partners: JSON.stringify(partnersData),
-          companyPhones: novaVidaData.telefones ? JSON.stringify(novaVidaData.telefones) : null,
-          companyEmails: novaVidaData.emails ? JSON.stringify(novaVidaData.emails) : null,
-          companyWhatsApp: novaVidaData.whatsapp?.[0] || null,
+          ...(novaVidaData.telefones && { companyPhones: JSON.stringify(novaVidaData.telefones) }),
+          ...(novaVidaData.emails && { companyEmails: JSON.stringify(novaVidaData.emails) }),
+          ...(novaVidaData.whatsapp?.[0] && { companyWhatsApp: novaVidaData.whatsapp[0] }),
           partnersLastUpdate: new Date(),
         }
       })
@@ -792,7 +792,7 @@ export class LeadOrchestratorService {
           await prisma.company.update({
             where: { id: companyId },
             data: {
-              linkedinFollowers: linkedInData.followers,
+              linkedinFollowers: linkedInData.followers ? linkedInData.followers.toString() : null,
               employees: linkedInData.employeesCount || company.employees,
               sector: linkedInData.industry || company.sector,
               location: linkedInData.headquarters || company.location,
@@ -872,29 +872,22 @@ export class LeadOrchestratorService {
         enrichedAt: new Date(),
       }
 
-      // Adicionar LinkedIn URL se encontrado (apenas a URL, não o objeto)
-      if (aiData.linkedinUrl) {
-        updateData.linkedinUrl = typeof aiData.linkedinUrl === 'string'
-          ? aiData.linkedinUrl
-          : aiData.linkedinUrl.url || null
-      }
-
-      // Adicionar website se encontrado
-      if (aiData.website) {
-        updateData.website = aiData.website
+      // Adicionar LinkedIn URL se encontrado
+      if (aiData.socialMedia?.linkedin?.url) {
+        updateData.linkedinUrl = aiData.socialMedia.linkedin.url
       }
 
       // Converter estimativas da IA para números se não tiver dados da Receita
-      if (!currentCompany?.revenue && aiData.revenue && aiData.revenue !== 'Não disponível') {
-        const revenueNumber = this.extractRevenueFromString(aiData.revenue)
+      if (!currentCompany?.revenue && aiData.estimatedRevenue && aiData.estimatedRevenue !== 'Não disponível') {
+        const revenueNumber = this.extractRevenueFromString(aiData.estimatedRevenue)
         if (revenueNumber) {
           updateData.revenue = revenueNumber
           console.log(`    Revenue (da IA): R$ ${(revenueNumber / 1_000_000).toFixed(1)}M`)
         }
       }
 
-      if (!currentCompany?.employees && aiData.employees && aiData.employees !== 'Não disponível') {
-        const employeesNumber = this.extractEmployeesFromString(aiData.employees)
+      if (!currentCompany?.employees && aiData.estimatedEmployees && aiData.estimatedEmployees !== 'Não disponível') {
+        const employeesNumber = this.extractEmployeesFromString(aiData.estimatedEmployees)
         if (employeesNumber) {
           updateData.employees = employeesNumber
           console.log(`    Funcionários (da IA): ${employeesNumber}`)
@@ -1082,8 +1075,8 @@ export class LeadOrchestratorService {
       await prisma.company.update({
         where: { id: companyId },
         data: {
-          recentNews: recentNews.length > 0 ? JSON.stringify(recentNews) : null,
-          upcomingEvents: upcomingEvents.length > 0 ? JSON.stringify(upcomingEvents) : null,
+          ...(recentNews.length > 0 && { recentNews: JSON.stringify(recentNews) }),
+          ...(upcomingEvents.length > 0 && { upcomingEvents: JSON.stringify(upcomingEvents) }),
           eventsDetectedAt: new Date(),
         },
       })
@@ -1386,10 +1379,10 @@ export class LeadOrchestratorService {
 
     try {
       if (company.recentNews) {
-        recentNews = JSON.parse(company.recentNews)
+        recentNews = JSON.parse(typeof company.recentNews === 'string' ? company.recentNews : JSON.stringify(company.recentNews))
       }
       if (company.upcomingEvents) {
-        upcomingEvents = JSON.parse(company.upcomingEvents)
+        upcomingEvents = JSON.parse(typeof company.upcomingEvents === 'string' ? company.upcomingEvents : JSON.stringify(company.upcomingEvents))
       }
     } catch (e) {
       console.error(`    ⚠️  Erro ao parsear eventos:`, e)

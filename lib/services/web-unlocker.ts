@@ -100,10 +100,9 @@ export class WebUnlockerService {
               companyName: company,
               location: location || 'Brasil',
               description: '',
-              postedDate: new Date().toISOString(),
+              postedDate: new Date(),
               jobUrl: url.startsWith('http') ? url : `https://portal.gupy.io${url}`,
               applicants: 0,
-              cnpj: null,
             })
           }
         } catch (err) {
@@ -149,10 +148,9 @@ export class WebUnlockerService {
               companyName: company,
               location: loc || location,
               description: '',
-              postedDate: new Date().toISOString(),
+              postedDate: new Date(),
               jobUrl: url.startsWith('http') ? url : `https://www.catho.com.br${url}`,
               applicants: 0,
-              cnpj: null,
             })
           }
         } catch (err) {
@@ -198,10 +196,9 @@ export class WebUnlockerService {
               companyName: company,
               location: loc || location,
               description: '',
-              postedDate: new Date().toISOString(),
+              postedDate: new Date(),
               jobUrl: url.startsWith('http') ? url : `https://www.infojobs.com.br${url}`,
               applicants: 0,
-              cnpj: null,
             })
           }
         } catch (err) {

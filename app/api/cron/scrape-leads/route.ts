@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
         jobsFound: result.totalJobs,
         leadsCreated: result.savedLeads,
         duration,
-        errors: result.errors.length > 0 ? JSON.stringify(result.errors) : null,
+        ...(result.errors.length > 0 && { errors: JSON.stringify(result.errors) }),
       },
     })
 
@@ -94,8 +94,8 @@ export async function GET(request: NextRequest) {
         where: { id: scrapeLogId },
         data: {
           status: 'error',
-          errors: JSON.stringify({ message: errorMessage }),
           duration,
+          errors: JSON.stringify({ message: errorMessage }),
         },
       })
     }

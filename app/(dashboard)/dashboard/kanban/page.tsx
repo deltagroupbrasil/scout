@@ -30,9 +30,6 @@ async function getLeadsByStatus(userId?: string, showAll: boolean = false) {
           location: true,
           website: true,
           linkedinUrl: true,
-          companyPhones: true,
-          companyEmails: true,
-          companyWhatsApp: true,
         },
       },
       assignedTo: {

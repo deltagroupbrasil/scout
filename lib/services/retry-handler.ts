@@ -19,7 +19,7 @@ export interface RetryOptions {
   minTimeout?: number           // Timeout mínimo em ms (padrão: 1000)
   maxTimeout?: number           // Timeout máximo em ms (padrão: 10000)
   factor?: number               // Fator de multiplicação (padrão: 2)
-  onFailedAttempt?: (error: pRetry.FailedAttemptError) => void
+  onFailedAttempt?: (error: any) => void
 }
 
 export interface CircuitBreakerState {

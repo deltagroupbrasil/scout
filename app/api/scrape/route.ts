@@ -26,12 +26,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Executar scraping com limite de empresas
-    const count = await leadOrchestrator.scrapeAndProcessLeads(query, maxCompanies)
+    const result = await leadOrchestrator.scrapeAndProcessLeads({
+      query,
+      maxCompanies
+    })
 
     return NextResponse.json({
       success: true,
-      message: `${count} leads processados com sucesso`,
-      count
+      message: `${result.savedLeads} leads processados com sucesso`,
+      count: result.savedLeads,
+      totalJobs: result.totalJobs,
+      errors: result.errors
     })
   } catch (error) {
     console.error('Erro no scraping:', error)

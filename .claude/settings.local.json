@@ -54,7 +54,8 @@
       "Bash(del scriptstest-discovery-services.ts 2)",
       "Bash(SPRINT2_COMPLETO.md)",
       "Bash(CLAUDE_API_KEY=\"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\" npx tsx scripts/test-cnpj-novavidati-flow.ts)",
-      "Bash(CLAUDE_API_KEY=\"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\" npx tsx scripts/test-events-detector.ts)"
+      "Bash(CLAUDE_API_KEY=\"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\" npx tsx scripts/test-events-detector.ts)",
+      "Bash(set CLAUDE_API_KEY=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)"
     ],
     "deny": [],
     "ask": []

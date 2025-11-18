@@ -49,11 +49,12 @@ export class WebsiteIntelligenceScraperService {
   async scrapeWebsite(websiteUrl: string, html?: string): Promise<WebsiteIntelligence> {
     console.log(`\n [Website Intelligence] Analisando: ${websiteUrl}`)
 
-    let pageHtml = html
+    let pageHtml: string | undefined = html
 
     // Se não foi passado HTML, fazer fetch via Bright Data Web Unlocker
     if (!pageHtml) {
-      pageHtml = await this.fetchWebsite(websiteUrl)
+      const fetched = await this.fetchWebsite(websiteUrl)
+      pageHtml = fetched || undefined
     }
 
     if (!pageHtml) {

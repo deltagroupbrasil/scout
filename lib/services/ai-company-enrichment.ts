@@ -239,11 +239,15 @@ ATENÇÃO: Retorne APENAS o JSON, sem texto adicional antes ou depois.`
       // Validar e retornar (match CompanyEnrichmentData interface)
       return {
         cnpj: cleanedCnpj,
-        revenue: data.estimatedRevenue || undefined,
-        employees: data.estimatedEmployees || undefined,
+        estimatedRevenue: data.estimatedRevenue || undefined,
+        estimatedEmployees: data.estimatedEmployees || undefined,
         sector: data.sector || undefined,
-        website: data.website || undefined,
-        linkedinUrl: data.socialMedia?.linkedin?.url || undefined,
+        location: data.location || undefined,
+        recentNews: data.recentNews || [],
+        upcomingEvents: data.upcomingEvents || [],
+        socialMedia: data.socialMedia || {},
+        industryPosition: data.industryPosition || undefined,
+        keyInsights: data.keyInsights || [],
       }
     } catch (error) {
       console.error('[AI Enrichment] Erro ao parsear resposta:', error)
@@ -257,11 +261,15 @@ ATENÇÃO: Retorne APENAS o JSON, sem texto adicional antes ou depois.`
   private getFallbackEnrichment(companyName: string): CompanyEnrichmentData {
     return {
       cnpj: undefined,
-      revenue: undefined,
-      employees: undefined,
+      estimatedRevenue: undefined,
+      estimatedEmployees: undefined,
       sector: undefined,
-      website: undefined,
-      linkedinUrl: undefined,
+      location: undefined,
+      recentNews: [],
+      upcomingEvents: [],
+      socialMedia: {},
+      industryPosition: undefined,
+      keyInsights: [],
     }
   }
 

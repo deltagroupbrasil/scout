@@ -118,11 +118,12 @@ export class PriorityScoreService {
    * Triggers de IA (0-10 pontos)
    * Presença de triggers indica lead bem qualificado
    */
-  private scoreTriggers(triggers: string | null): number {
+  private scoreTriggers(triggers: any): number {
     if (!triggers) return 0
 
     try {
-      const parsedTriggers = JSON.parse(triggers) as string[]
+      const triggersStr = typeof triggers === 'string' ? triggers : JSON.stringify(triggers)
+      const parsedTriggers = JSON.parse(triggersStr) as string[]
       if (parsedTriggers.length >= 3) return 10
       if (parsedTriggers.length >= 2) return 7
       if (parsedTriggers.length >= 1) return 5

@@ -95,13 +95,13 @@ export async function GET(request: Request) {
     // Data rows
     for (const lead of leads) {
       const suggestedContacts = lead.suggestedContacts
-        ? JSON.parse(lead.suggestedContacts)
+        ? JSON.parse(typeof lead.suggestedContacts === 'string' ? lead.suggestedContacts : JSON.stringify(lead.suggestedContacts))
             .map((c: any) => `${c.name} (${c.role})`)
             .join('; ')
         : ''
 
       const triggers = lead.triggers
-        ? JSON.parse(lead.triggers).join('; ')
+        ? JSON.parse(typeof lead.triggers === 'string' ? lead.triggers : JSON.stringify(lead.triggers)).join('; ')
         : ''
 
       csvRows.push([

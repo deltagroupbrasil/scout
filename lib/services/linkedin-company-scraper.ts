@@ -41,7 +41,7 @@ export class LinkedInCompanyScraperService {
 
     console.log(` [LinkedIn Company] Scraping: ${companyUrl}`)
 
-    let browser = null
+    let browser: any = null
     try {
       // Conectar ao browser remoto do Bright Data
       browser = await puppeteer.connect({

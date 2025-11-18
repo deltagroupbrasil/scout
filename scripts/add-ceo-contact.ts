@@ -78,7 +78,7 @@ async function addCEOContact() {
 
   console.log('\n✨ CONTATOS SUGERIDOS:')
   console.log('=====================================')
-  const contacts = JSON.parse(updatedLead!.suggestedContacts || '[]')
+  const contacts = JSON.parse(typeof updatedLead!.suggestedContacts === 'string' ? updatedLead!.suggestedContacts : JSON.stringify(updatedLead!.suggestedContacts || '[]'))
   contacts.forEach((contact: any, i: number) => {
     console.log(`\n${i + 1}. ${contact.name}`)
     console.log(`   Cargo: ${contact.role}`)

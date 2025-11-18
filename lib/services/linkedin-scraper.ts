@@ -138,7 +138,7 @@ export class LinkedInScraperService {
                   companyName: company || 'Empresa não identificada',
                   location: '',
                   jobUrl: url,
-                  postedDate: new Date().toISOString().split('T')[0],
+                  postedDate: new Date(),
                 })
 
                 if (index < 3) {
