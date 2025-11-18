@@ -30,7 +30,7 @@ model User {
   contactFeedbacks ContactFeedback[]
   assignedLeads    Lead[]
 
-  @@map("users")
+  @@map("User")
 }
 
 // ============================================
