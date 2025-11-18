@@ -89,7 +89,7 @@ model Company {
 
   leads       Lead[]
 
-  @@map("companies")
+  @@map("Company")
 }
 
 // ============================================
@@ -136,7 +136,7 @@ model Lead {
   @@index([createdAt])
   @@index([companyId])
   @@index([assignedToId])
-  @@map("leads")
+  @@map("Lead")
 }
 
 // ============================================
@@ -153,7 +153,7 @@ model Note {
 
   @@index([leadId])
   @@index([createdAt])
-  @@map("notes")
+  @@map("Note")
 }
 
 // ============================================
@@ -170,7 +170,7 @@ model ScrapeLog {
   createdAt     DateTime @default(now())
 
   @@index([createdAt])
-  @@map("scrape_logs")
+  @@map("ScrapeLog")
 }
 
 // ============================================
@@ -197,7 +197,7 @@ model EnrichmentCache {
 
   @@index([cnpj])
   @@index([expiresAt])
-  @@map("enrichment_cache")
+  @@map("EnrichmentCache")
 }
 
 // ============================================
@@ -212,7 +212,7 @@ model NovaVidaTIUsage {
 
   @@index([createdAt])
   @@index([cnpj])
-  @@map("nova_vida_ti_usage")
+  @@map("NovaVidaTIUsage")
 }
 
 // ============================================
@@ -242,7 +242,7 @@ model ContactFeedback {
   @@index([userId])
   @@index([contactSource])
   @@index([isCorrect])
-  @@map("contact_feedback")
+  @@map("ContactFeedback")
 }
 
 // ============================================
@@ -254,5 +254,5 @@ enum LeadStatus {
   QUALIFIED   // Qualificado - Lead com potencial confirmado
   DISCARDED   // Descartado - Lead sem fit
 
-  @@map("lead_status")
+  @@map("LeadStatus")
 }
