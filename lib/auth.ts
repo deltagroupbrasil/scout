@@ -48,6 +48,7 @@ export const authOptions: NextAuthOptions = {
             id: user.id,
             email: user.email,
             name: user.name,
+            isAdmin: user.isAdmin,
           }
         } catch (error: any) {
           console.error('[Auth] Erro durante autenticação:', error.message)
@@ -67,12 +68,14 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id
+        token.isAdmin = user.isAdmin
       }
       return token
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string
+        session.user.isAdmin = token.isAdmin as boolean
       }
       return session
     }

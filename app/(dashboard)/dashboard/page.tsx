@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useSession } from "next-auth/react"
 import { LeadFilters, LeadWithCompany, PaginatedResponse } from "@/types"
 import LeadFiltersComponent from "@/components/dashboard/lead-filters"
 import LeadsTable from "@/components/dashboard/leads-table"
@@ -9,6 +10,7 @@ import ScrapeButton from "@/components/dashboard/scrape-button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function DashboardPage() {
+  const { data: session } = useSession()
   const [leads, setLeads] = useState<LeadWithCompany[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([])
@@ -155,7 +157,7 @@ export default function DashboardPage() {
               </CardDescription>
             </div>
             <div className="flex gap-2">
-              <ScrapeButton onComplete={fetchLeads} />
+              <ScrapeButton onComplete={fetchLeads} isAdmin={session?.user?.isAdmin} />
               <button
                 onClick={exportToCSV}
                 className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"

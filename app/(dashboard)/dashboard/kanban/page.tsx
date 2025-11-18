@@ -73,6 +73,11 @@ export default async function KanbanPage({
     redirect("/login")
   }
 
+  // Apenas admin pode acessar o Kanban
+  if (!session.user.isAdmin) {
+    redirect("/dashboard")
+  }
+
   const params = await searchParams
   const showAll = params.view === 'all'
 

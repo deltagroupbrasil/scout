@@ -727,6 +727,13 @@ export class LeadOrchestratorService {
         linkedin: socio.linkedin || null,
       }))
 
+      // Calcular faturamento presumido se não tiver revenue (Capital Social × 5)
+      let estimatedRevenue: number | undefined = undefined
+      if (!company.revenue && novaVidaData.capitalSocial) {
+        estimatedRevenue = novaVidaData.capitalSocial * 5
+        console.log(`    Faturamento presumido (Capital Social × 5): R$ ${estimatedRevenue.toLocaleString('pt-BR')}`)
+      }
+
       // Atualizar empresa com dados completos
       await prisma.company.update({
         where: { id: company.id },
@@ -735,6 +742,8 @@ export class LeadOrchestratorService {
           ...(novaVidaData.telefones && { companyPhones: JSON.stringify(novaVidaData.telefones) }),
           ...(novaVidaData.emails && { companyEmails: JSON.stringify(novaVidaData.emails) }),
           ...(novaVidaData.whatsapp?.[0] && { companyWhatsApp: novaVidaData.whatsapp[0] }),
+          ...(estimatedRevenue && { revenue: estimatedRevenue }),
+          ...(novaVidaData.qtdeFuncionarios && !company.employees && { employees: novaVidaData.qtdeFuncionarios }),
           partnersLastUpdate: new Date(),
         }
       })
@@ -1142,9 +1151,13 @@ export class LeadOrchestratorService {
     companiesProcessed: number
     errors: string[]
   }> {
+    const startTime = Date.now()
+    const TIMEOUT_LIMIT = 50000 // 50 segundos (deixa 10s de margem para o Vercel)
+
     const { query, maxCompanies = 20 } = options
     console.log(' Iniciando scraping de vagas de múltiplas fontes...')
     console.log(`⚙  Limite: ${maxCompanies} empresas`)
+    console.log(`⏱  Timeout configurado: ${TIMEOUT_LIMIT/1000}s`)
 
     // Buscar em múltiplas localizações para ter mais resultados
     const locations = [
@@ -1208,20 +1221,31 @@ export class LeadOrchestratorService {
 
     console.log(`\n📊 Total de vagas encontradas até agora: ${totalJobs}`)
 
-    if (totalJobs < 5) {
-      console.log(`\n⚠️  Poucas vagas encontradas (${totalJobs}), ativando FALLBACK PÚBLICO...`)
-      publicJobs = await publicScraper.scrapeJobs(query).catch(err => {
-        console.error('[PublicScraper] Erro:', err)
-        return []
-      })
+    // SEMPRE ativar fallback em produção para garantir resultados
+    const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
 
-      console.log(` Fallback público retornou ${publicJobs.length} vagas`)
+    if (isProduction || totalJobs < 5) {
+      console.log(`\n⚠️  ${isProduction ? 'PRODUÇÃO: Ativando' : 'Poucas vagas, ativando'} FALLBACK PÚBLICO...`)
 
-      // Se ainda assim não encontrou nada, usar fallback de empresas reais
-      if (publicJobs.length === 0) {
-        console.log(' ⚠️  Nenhuma vaga via scraping público, usando fallback de empresas reais brasileiras')
+      try {
+        publicJobs = await publicScraper.scrapeJobs(query).catch(err => {
+          console.error('[PublicScraper] Erro:', err)
+          return []
+        })
+
+        console.log(` Fallback público retornou ${publicJobs.length} vagas`)
+
+        // Se ainda assim não encontrou nada, usar fallback de empresas reais
+        if (publicJobs.length === 0) {
+          console.log(' ⚠️  Nenhuma vaga via scraping público, usando fallback de empresas reais brasileiras')
+          publicJobs = publicScraper.getFallbackJobs(query)
+          console.log(` Fallback de empresas reais retornou ${publicJobs.length} vagas`)
+        }
+      } catch (err) {
+        console.error('[Fallback] Erro ao ativar fallback:', err)
+        // Se tudo falhar, usar fallback de empresas reais
         publicJobs = publicScraper.getFallbackJobs(query)
-        console.log(` Fallback de empresas reais retornou ${publicJobs.length} vagas`)
+        console.log(` Fallback de emergência retornou ${publicJobs.length} vagas`)
       }
     } else {
       console.log(' ✅ Vagas suficientes encontradas, não é necessário fallback')
@@ -1275,7 +1299,15 @@ export class LeadOrchestratorService {
 
     // Processar cada empresa (agrupa múltiplas vagas em um único lead)
     for (const [companyName, jobs] of limitedCompanies) {
-      console.log(`\n Processando: ${jobs[0].companyName} (${jobs.length} vagas)`)
+      // Verificar se está perto do timeout
+      const elapsedTime = Date.now() - startTime
+      if (elapsedTime > TIMEOUT_LIMIT) {
+        console.log(`\n⏱️  TIMEOUT: ${(elapsedTime/1000).toFixed(1)}s atingidos, parando processamento`)
+        errors.push(`Timeout: processadas ${successCount} de ${limitedCompanies.length} empresas`)
+        break
+      }
+
+      console.log(`\n Processando: ${jobs[0].companyName} (${jobs.length} vagas) [${(elapsedTime/1000).toFixed(1)}s decorridos]`)
 
       try {
         const leadId = await this.processCompanyWithMultipleJobs(jobs)
@@ -1289,7 +1321,7 @@ export class LeadOrchestratorService {
       }
 
       // Delay para não sobrecarregar APIs
-      await this.sleep(1000)
+      await this.sleep(500) // Reduzido de 1000ms para 500ms
     }
 
     console.log(` ${successCount} leads criados com sucesso`)

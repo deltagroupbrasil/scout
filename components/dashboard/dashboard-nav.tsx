@@ -23,20 +23,27 @@ interface DashboardNavProps {
 export default function DashboardNav({ user }: DashboardNavProps) {
   const pathname = usePathname()
 
-  const navItems = [
+  const allNavItems = [
     {
       href: "/dashboard",
       label: "Lista",
       icon: LayoutList,
       active: pathname === "/dashboard" || pathname?.startsWith("/dashboard/leads"),
+      adminOnly: false,
     },
     {
       href: "/dashboard/kanban",
       label: "Kanban",
       icon: LayoutDashboard,
       active: pathname === "/dashboard/kanban",
+      adminOnly: true, // Apenas admin pode ver o Kanban
     },
   ]
+
+  // Filtrar itens de navegação baseado em permissões
+  const navItems = allNavItems.filter(item =>
+    !item.adminOnly || user.isAdmin
+  )
 
   return (
     <nav className="border-b bg-white dark:bg-gray-800">

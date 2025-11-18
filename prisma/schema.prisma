@@ -18,6 +18,7 @@ model User {
   email     String   @unique
   password  String
   name      String
+  isAdmin   Boolean  @default(false)  // Admin pode buscar leads e acessar Kanban
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

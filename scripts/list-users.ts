@@ -20,6 +20,7 @@ async function listUsers() {
         id,
         email,
         name,
+        "isAdmin",
         "createdAt",
         "updatedAt"
       FROM "User"
@@ -29,7 +30,8 @@ async function listUsers() {
     console.log(`📊 Total de usuários: ${result.rows.length}\n`)
 
     result.rows.forEach((user, index) => {
-      console.log(`Usuário ${index + 1}:`)
+      const adminLabel = user.isAdmin ? '👑 ADMIN' : '👤 USER'
+      console.log(`Usuário ${index + 1} ${adminLabel}:`)
       console.log(`  ID: ${user.id}`)
       console.log(`  Email: ${user.email}`)
       console.log(`  Nome: ${user.name}`)

@@ -2,18 +2,28 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { RefreshCw, Search } from "lucide-react"
+import { RefreshCw, Search, Lock } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 interface ScrapeButtonProps {
   onComplete?: () => void
+  isAdmin?: boolean
 }
 
-export default function ScrapeButton({ onComplete }: ScrapeButtonProps) {
+export default function ScrapeButton({ onComplete, isAdmin = false }: ScrapeButtonProps) {
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
 
   async function handleScrape() {
+    if (!isAdmin) {
+      toast({
+        title: "Acesso restrito",
+        description: "Apenas administradores podem buscar novas vagas",
+        variant: "destructive",
+      })
+      return
+    }
+
     console.log('🔵 Botão "Buscar" clicado!')
     setLoading(true)
 
@@ -22,7 +32,7 @@ export default function ScrapeButton({ onComplete }: ScrapeButtonProps) {
 
       toast({
         title: "Buscando vagas...",
-        description: "Aguarde enquanto procuramos novas oportunidades (limite: 20 empresas)",
+        description: "Aguarde enquanto procuramos novas oportunidades (limite: 5 empresas)",
       })
 
       const response = await fetch('/api/scrape', {
@@ -32,7 +42,7 @@ export default function ScrapeButton({ onComplete }: ScrapeButtonProps) {
         },
         body: JSON.stringify({
           query: 'Controller OR CFO OR "Gerente Financeiro" OR "Diretor Financeiro" OR Controladoria São Paulo',
-          maxCompanies: 20
+          maxCompanies: 5  // Reduzido para 5 para evitar timeout em serverless
         }),
       })
 
@@ -68,6 +78,11 @@ export default function ScrapeButton({ onComplete }: ScrapeButtonProps) {
       setLoading(false)
       console.log('🏁 Busca finalizada')
     }
+  }
+
+  // Não renderizar o botão para não-admin
+  if (!isAdmin) {
+    return null
   }
 
   return (
