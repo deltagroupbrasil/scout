@@ -18,15 +18,22 @@ export default function ScrapeButton({ onComplete }: ScrapeButtonProps) {
     setLoading(true)
 
     try {
-      console.log('📡 Enviando requisição para /api/cron/scrape-leads...')
+      console.log('📡 Enviando requisição para /api/scrape...')
 
       toast({
         title: "Buscando vagas...",
         description: "Aguarde enquanto procuramos novas oportunidades (limite: 20 empresas)",
       })
 
-      const response = await fetch('/api/cron/scrape-leads', {
+      const response = await fetch('/api/scrape', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: 'Controller OR CFO OR "Gerente Financeiro" OR "Diretor Financeiro" OR Controladoria São Paulo',
+          maxCompanies: 20
+        }),
       })
 
       console.log('📥 Resposta recebida:', response.status, response.statusText)
@@ -42,7 +49,7 @@ export default function ScrapeButton({ onComplete }: ScrapeButtonProps) {
 
       toast({
         title: "Busca concluída!",
-        description: `${data.leadsCreated} novas vagas encontradas em ${Math.floor(data.duration / 60)} minutos`,
+        description: data.message || `${data.count} novas vagas encontradas`,
       })
 
       // Chamar callback para recarregar lista
