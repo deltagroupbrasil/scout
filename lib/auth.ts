@@ -12,30 +12,47 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error("Email e senha são obrigatórios")
-        }
+        try {
+          console.log('[Auth] Tentando autenticar:', credentials?.email)
 
-        const user = await prisma.user.findUnique({
-          where: {
-            email: credentials.email
+          if (!credentials?.email || !credentials?.password) {
+            console.error('[Auth] Credenciais incompletas')
+            throw new Error("Email e senha são obrigatórios")
           }
-        })
 
-        if (!user) {
-          throw new Error("Credenciais inválidas")
-        }
+          console.log('[Auth] Buscando usuário no banco...')
+          const user = await prisma.user.findUnique({
+            where: {
+              email: credentials.email.toLowerCase()
+            }
+          })
 
-        const isPasswordValid = await compare(credentials.password, user.password)
+          if (!user) {
+            console.error('[Auth] Usuário não encontrado:', credentials.email)
+            throw new Error("Credenciais inválidas")
+          }
 
-        if (!isPasswordValid) {
-          throw new Error("Credenciais inválidas")
-        }
+          console.log('[Auth] Usuário encontrado:', user.id)
+          console.log('[Auth] Comparando senha...')
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
+          const isPasswordValid = await compare(credentials.password, user.password)
+
+          if (!isPasswordValid) {
+            console.error('[Auth] Senha inválida')
+            throw new Error("Credenciais inválidas")
+          }
+
+          console.log('[Auth] ✅ Autenticação bem-sucedida!')
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+          }
+        } catch (error: any) {
+          console.error('[Auth] Erro durante autenticação:', error.message)
+          console.error('[Auth] Stack:', error.stack)
+          throw error
         }
       }
     })
