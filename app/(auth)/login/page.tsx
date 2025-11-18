@@ -93,10 +93,18 @@ export default function LoginPage() {
               {loading ? "Entrando..." : "Entrar"}
             </Button>
 
-            <div className="text-center text-sm text-gray-600 dark:text-gray-400">
-              <a href="#" className="hover:underline">
-                Esqueci minha senha
-              </a>
+            <div className="text-center text-sm text-gray-600 dark:text-gray-400 space-y-2">
+              <div>
+                <a href="#" className="hover:underline">
+                  Esqueci minha senha
+                </a>
+              </div>
+              <div>
+                Não tem uma conta?{" "}
+                <a href="/register" className="text-blue-600 hover:text-blue-700 font-medium">
+                  Criar conta
+                </a>
+              </div>
             </div>
           </form>
         </CardContent>
