@@ -42,14 +42,11 @@ export async function POST(request: Request) {
         email: email.toLowerCase(),
         password: passwordHash,
         name,
-        role: "user",
-        isActive: true,
       },
       select: {
         id: true,
         email: true,
         name: true,
-        role: true,
       },
     })
 
