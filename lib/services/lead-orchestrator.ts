@@ -1162,16 +1162,24 @@ export class LeadOrchestratorService {
 
     const allLinkedInJobs: LinkedInJobData[] = []
 
-    // Buscar LinkedIn em todas as localizações (7 dias de vagas)
-    for (const location of locations) {
-      try {
-        console.log(` LinkedIn: ${location}`)
-        const jobs = await linkedInScraper.searchJobs(query, location, 7) // 7 dias
-        allLinkedInJobs.push(...jobs)
-        await this.sleep(2000) // Delay entre buscas
-      } catch (err) {
-        console.error(`[LinkedIn ${location}] Erro:`, err)
+    // SEMPRE usar API pública (Puppeteer não funciona em Vercel)
+    console.log('🌐 Usando LinkedIn API Pública (compatível com serverless)')
+    try {
+      // Buscar em múltiplas localizações via API pública
+      for (const location of locations.slice(0, 3)) { // Limitar a 3 localizações para não sobrecarregar
+        try {
+          console.log(` LinkedIn Público: ${location}`)
+          const jobs = await publicScraper.scrapeJobs(query, location)
+          allLinkedInJobs.push(...jobs)
+          console.log(`   → ${jobs.length} vagas encontradas`)
+          await this.sleep(1000) // Delay entre buscas
+        } catch (err) {
+          console.error(`[LinkedIn Público ${location}] Erro:`, err)
+        }
       }
+      console.log(` Total LinkedIn: ${allLinkedInJobs.length} vagas`)
+    } catch (err) {
+      console.error('[LinkedIn Público] Erro:', err)
     }
 
     // Outras fontes brasileiras (prioridade: Indeed, Glassdoor, Gupy, Catho)

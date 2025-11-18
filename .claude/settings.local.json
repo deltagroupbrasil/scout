@@ -55,7 +55,19 @@
       "Bash(SPRINT2_COMPLETO.md)",
       "Bash(CLAUDE_API_KEY=\"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\" npx tsx scripts/test-cnpj-novavidati-flow.ts)",
       "Bash(CLAUDE_API_KEY=\"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\" npx tsx scripts/test-events-detector.ts)",
-      "Bash(set CLAUDE_API_KEY=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)"
+      "Bash(set CLAUDE_API_KEY=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)",
+      "Bash(openssl rand:*)",
+      "Bash(set DATABASE_URL=postgresql://neondb_owner:npg_PL4yEHAcdvQ5@ep-calm-meadow-ady4ssjy-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require:*)",
+      "Bash(copy:*)",
+      "WebFetch(domain:leapscout.vercel.app)",
+      "Bash(vercel --version:*)",
+      "Bash(vercel login)",
+      "Bash(vercel link:*)",
+      "Bash(vercel:*)",
+      "Bash(git config:*)",
+      "Bash(psql \"postgresql://neondb_owner:npg_PL4yEHAcdvQ5@ep-calm-meadow-ady4ssjy-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require\" -c \"\\dt\")",
+      "Bash(winget install:*)",
+      "Bash(neonctl:*)"
     ],
     "deny": [],
     "ask": []
