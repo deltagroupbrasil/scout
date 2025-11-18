@@ -131,12 +131,17 @@ export default function CompanyEventsCard({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Calendar className="h-5 w-5" />
-          Eventos Recentes
+          Eventos e Notícias
         </CardTitle>
         <CardDescription>
           {eventsDetectedAt
-            ? `Detectados ${formatDistance(new Date(eventsDetectedAt), new Date(), { addSuffix: true, locale: ptBR })}`
-            : 'Eventos e notícias da empresa'}
+            ? `Última atualização ${formatDistance(new Date(eventsDetectedAt), new Date(), { addSuffix: true, locale: ptBR })}`
+            : 'Eventos detectados automaticamente'}
+          {recentNews.length > 0 && upcomingEvents.length > 0 && (
+            <span className="ml-2">
+              • {recentNews.length} notícias • {upcomingEvents.length} eventos futuros
+            </span>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -194,33 +199,37 @@ export default function CompanyEventsCard({
         {upcomingEvents.length > 0 && (
           <div className="space-y-3">
             <h3 className="font-semibold text-sm text-gray-700 flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Eventos Futuros ({upcomingEvents.length})
+              <Rocket className="h-4 w-4 text-purple-600" />
+              Próximos Eventos ({upcomingEvents.length})
             </h3>
             <div className="space-y-3">
               {upcomingEvents.map((event, idx) => (
-                <div key={idx} className="border-l-2 border-blue-200 pl-4 space-y-1">
-                  <div className="flex items-start gap-2">
+                <div key={idx} className="border-l-2 border-purple-300 pl-4 space-y-1 bg-purple-50/50 rounded-r-lg p-3">
+                  <div className="flex items-start justify-between gap-2">
                     <Badge variant="outline" className={getEventBadgeColor(event.type)}>
                       <span className="flex items-center gap-1">
                         {getEventIcon(event.type)}
                         {getEventLabel(event.type)}
                       </span>
                     </Badge>
-                  </div>
-                  <p className="font-medium text-sm">{event.title}</p>
-                  {event.description && (
-                    <p className="text-xs text-gray-600">{event.description}</p>
-                  )}
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <span>{event.source}</span>
-                    <span>•</span>
-                    <span>
-                      {formatDistance(new Date(event.date), new Date(), {
+                    <span className="text-xs font-medium text-purple-700">
+                      🗓️ {formatDistance(new Date(event.date), new Date(), {
                         addSuffix: true,
                         locale: ptBR
                       })}
                     </span>
+                  </div>
+                  <p className="font-medium text-sm text-purple-900">{event.title}</p>
+                  {event.description && (
+                    <p className="text-xs text-gray-700">{event.description}</p>
+                  )}
+                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                    <span>📍 {event.source}</span>
+                  </div>
+                  <div className="mt-2 p-2 bg-white rounded border border-purple-200">
+                    <p className="text-xs text-purple-800 font-medium">
+                      💡 Gatilho de abordagem: Use este evento como ponto de entrada para iniciar contato
+                    </p>
                   </div>
                 </div>
               ))}

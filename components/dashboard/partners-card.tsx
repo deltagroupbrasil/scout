@@ -27,7 +27,7 @@ export default function PartnersCard({
   companyEmails,
   companyWhatsApp
 }: PartnersCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(true) // Expandido por padrão
 
   // Parse JSON data
   let partners: Partner[] = []
@@ -54,10 +54,10 @@ export default function PartnersCard({
           <div className="flex-1">
             <CardTitle className="text-lg flex items-center gap-2">
               <User className="h-5 w-5" />
-              Sócios e Contatos Corporativos
+              Sócios e Decisores
             </CardTitle>
             <CardDescription>
-              {partners.length > 0 && `${partners.length} sócio(s)`}
+              {partners.length > 0 && `${partners.length} sócio(s) verificado(s)`}
               {partners.length > 0 && (phones.length > 0 || emails.length > 0) && ' • '}
               {phones.length > 0 && `${phones.length} telefone(s)`}
               {phones.length > 0 && emails.length > 0 && ' • '}

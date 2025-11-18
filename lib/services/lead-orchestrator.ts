@@ -21,6 +21,7 @@ import { openCNPJEnrichment } from "./opencnpj-enrichment"
 import { novaVidaTIEnrichment } from "./novavidati-enrichment"
 import { websiteIntelligenceScraper } from "./website-intelligence-scraper"
 import { eventsDetector } from "./events-detector"
+import { approachTriggersGenerator } from "./approach-triggers-generator"
 // import { socialMediaFinder } from "./social-media-finder" // Temporariamente desabilitado - encoding issues
 
 export class LeadOrchestratorService {
@@ -406,9 +407,13 @@ export class LeadOrchestratorService {
 
       console.log(`\n Total de contatos encontrados: ${enrichedContacts.length}`)
 
-      // 6. Gerar triggers (baseado em todas as vagas + dados da IA)
-      const allJobTitles = jobs.map(j => j.jobTitle).join(' ')
-      triggers = this.generateTriggers(updatedCompany || company, allJobTitles)
+      // 6. Gerar triggers CONTEXTUALIZADOS (baseado em eventos, notícias e dados da empresa)
+      const allJobTitles = jobs.map(j => j.jobTitle).join(', ')
+      triggers = await this.generateContextualTriggers(
+        updatedCompany || company,
+        mainJob.jobTitle,
+        allJobTitles
+      )
 
       // 7. Calcular priority score
       const priorityScoreValue = priorityScore.calculate({
@@ -661,6 +666,9 @@ export class LeadOrchestratorService {
     // 6. Enriquecer com IA (CNPJ, revenue, employees, setor)
     await this.enrichCompanyWithAI(company.id, companyName, company.sector, company.website)
 
+    // 7. Detectar eventos e notícias da empresa
+    await this.detectCompanyEvents(company.id, companyName)
+
     return company
   }
 
@@ -801,6 +809,9 @@ export class LeadOrchestratorService {
 
       // 3. AI Enrichment (CNPJ, revenue, employees, setor)
       await this.enrichCompanyWithAI(companyId, companyName, company.sector, company.website)
+
+      // 4. Detectar eventos e notícias da empresa
+      await this.detectCompanyEvents(companyId, companyName)
     } catch (error) {
       console.error(` Erro ao enriquecer empresa ${companyName}:`, error)
     }
@@ -953,7 +964,7 @@ export class LeadOrchestratorService {
     try {
       console.log(`\n [Event Detection] Detectando eventos: ${companyName}`)
 
-      // Buscar redes sociais verificadas
+      // Buscar redes sociais verificadas E data da última detecção
       const company = await prisma.company.findUnique({
         where: { id: companyId },
         select: {
@@ -966,27 +977,52 @@ export class LeadOrchestratorService {
           linkedinUrl: true,
           youtubeHandle: true,
           youtubeVerified: true,
+          eventsDetectedAt: true,
         },
       })
 
       if (!company) return
 
-      // Preparar dados de redes sociais verificadas
+      // CACHE: Verificar se já detectamos eventos recentemente (últimas 7 dias)
+      if (company.eventsDetectedAt) {
+        const daysSinceDetection = Math.floor(
+          (Date.now() - new Date(company.eventsDetectedAt).getTime()) / (1000 * 60 * 60 * 24)
+        )
+
+        if (daysSinceDetection < 7) {
+          console.log(`   ⚡ Cache: Eventos detectados há ${daysSinceDetection} dias - pulando nova detecção`)
+          return
+        } else {
+          console.log(`   🔄 Eventos desatualizados (${daysSinceDetection} dias) - re-detectando...`)
+        }
+      }
+
+      // Preparar dados de redes sociais verificadas (URLs completas para facilitar busca)
       const socialMedia: any = {}
       if (company.instagramVerified && company.instagramHandle) {
-        socialMedia.instagram = company.instagramHandle
+        socialMedia.instagram = `https://instagram.com/${company.instagramHandle}`
+        console.log(`   📸 Instagram verificado: @${company.instagramHandle}`)
       }
       if (company.twitterVerified && company.twitterHandle) {
-        socialMedia.twitter = company.twitterHandle
+        socialMedia.twitter = `https://twitter.com/${company.twitterHandle}`
+        console.log(`   🐦 Twitter verificado: @${company.twitterHandle}`)
       }
       if (company.facebookVerified && company.facebookHandle) {
-        socialMedia.facebook = company.facebookHandle
+        socialMedia.facebook = `https://facebook.com/${company.facebookHandle}`
+        console.log(`   📘 Facebook verificado: ${company.facebookHandle}`)
       }
       if (company.linkedinUrl) {
         socialMedia.linkedin = company.linkedinUrl
+        console.log(`   💼 LinkedIn: ${company.linkedinUrl}`)
       }
       if (company.youtubeVerified && company.youtubeHandle) {
-        socialMedia.youtube = company.youtubeHandle
+        socialMedia.youtube = `https://youtube.com/${company.youtubeHandle}`
+        console.log(`   📺 YouTube verificado: ${company.youtubeHandle}`)
+      }
+
+      const socialMediaCount = Object.keys(socialMedia).length
+      if (socialMediaCount > 0) {
+        console.log(`   ✅ ${socialMediaCount} rede(s) social(is) verificada(s) - incluindo na busca de eventos`)
       }
 
       // Detectar eventos
@@ -1006,11 +1042,18 @@ export class LeadOrchestratorService {
 
       // Separar notícias recentes e eventos futuros
       const now = new Date()
-      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+      const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
 
+      // NOTÍCIAS RECENTES: Eventos PASSADOS dos últimos 60 dias (news, leadership_change, funding, award, expansion)
       const recentNews = relevantEvents
-        .filter(e => e.type === 'news' && e.date >= thirtyDaysAgo)
+        .filter(e => {
+          const eventDate = new Date(e.date)
+          return eventDate >= sixtyDaysAgo && eventDate <= now // Apenas eventos passados e recentes
+        })
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) // Ordenar do mais recente
+        .slice(0, 5) // Limitar a 5 notícias
         .map(e => ({
+          type: e.type,
           title: e.title,
           description: e.description,
           date: e.date.toISOString(),
@@ -1019,8 +1062,14 @@ export class LeadOrchestratorService {
           sentiment: e.sentiment
         }))
 
+      // EVENTOS FUTUROS: Conferências, lançamentos, eventos agendados (data > hoje)
       const upcomingEvents = relevantEvents
-        .filter(e => e.type !== 'news' && e.date >= now)
+        .filter(e => {
+          const eventDate = new Date(e.date)
+          return eventDate > now // Apenas eventos futuros
+        })
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) // Ordenar do mais próximo
+        .slice(0, 3) // Limitar a 3 eventos
         .map(e => ({
           type: e.type,
           title: e.title,
@@ -1321,67 +1370,47 @@ export class LeadOrchestratorService {
    * Ex: "Controller Jr" → ["CFO", "Finance Director", "Controller"]
    */
   /**
-   * Gera triggers de abordagem RELEVANTES baseados na empresa e vagas
+   * Gera triggers de abordagem CONTEXTUALIZADOS usando IA
+   * Analisa eventos, notícias e dados da empresa para criar gatilhos personalizados
    */
-  private generateTriggers(company: any, jobTitles: string): string[] {
-    const triggers: string[] = []
-    const lowerTitles = jobTitles.toLowerCase()
+  private async generateContextualTriggers(
+    company: any,
+    mainJobTitle: string,
+    allJobTitles: string
+  ): Promise<string[]> {
+    console.log(`\n💡 Gerando gatilhos contextualizados...`)
 
-    // Analisar nível da vaga
-    const isC_Level = lowerTitles.includes('cfo') || lowerTitles.includes('diretor')
-    const isManager = lowerTitles.includes('gerente') || lowerTitles.includes('coordenador')
-    const isController = lowerTitles.includes('controller') || lowerTitles.includes('controladoria')
+    // Preparar contexto para o gerador de triggers
+    let recentNews: any[] = []
+    let upcomingEvents: any[] = []
 
-    // Trigger 1: Oportunidade de escopo do serviço
-    if (isC_Level) {
-      triggers.push('Vaga de alta liderança indica possível reestruturação financeira - momento ideal para BPO completo')
-    } else if (isController) {
-      triggers.push('Contratação de Controller sugere necessidade de processos mais robustos - oportunidade para automação contábil')
-    } else if (isManager) {
-      triggers.push('Expansão da equipe financeira - possível sobrecarga que pode ser resolvida com terceirização')
-    }
-
-    // Trigger 2: Análise de porte e revenue
-    if (company.revenue && company.revenue > 100_000_000) {
-      triggers.push(`Faturamento ${this.formatRevenueShort(company.revenue)} - perfil ideal para serviços de Controladoria avançada`)
-    } else if (company.employees && company.employees > 200) {
-      triggers.push(`${company.employees}+ funcionários - complexidade operacional justifica BPO Financeiro especializado`)
-    }
-
-    // Trigger 3: Recência da vaga
-    triggers.push('Vaga recente publicada - timing perfeito para abordagem proativa com proposta consultiva')
-
-    // Trigger 4: Setor específico
-    if (company.sector) {
-      const sectorInsights: Record<string, string> = {
-        'varejo': 'Varejo demanda controles rigorosos de estoque e fluxo de caixa - nossa especialidade',
-        'tecnologia': 'Startups tech precisam de controladoria ágil para crescimento escalável',
-        'saúde': 'Setor regulado requer compliance contábil rigoroso',
-        'indústria': 'Manufatura necessita de custeio industrial e controles de produção'
+    try {
+      if (company.recentNews) {
+        recentNews = JSON.parse(company.recentNews)
       }
-
-      const sectorKey = Object.keys(sectorInsights).find(key =>
-        company.sector?.toLowerCase().includes(key)
-      )
-
-      if (sectorKey) {
-        triggers.push(sectorInsights[sectorKey])
+      if (company.upcomingEvents) {
+        upcomingEvents = JSON.parse(company.upcomingEvents)
       }
+    } catch (e) {
+      console.error(`    ⚠️  Erro ao parsear eventos:`, e)
     }
 
-    // Trigger 5: Notícias recentes (se disponível)
-    if (company.recentNews) {
-      try {
-        const news = JSON.parse(company.recentNews)
-        if (news.length > 0) {
-          triggers.push(`Empresa em evidência na mídia recentemente - momento estratégico para networking`)
-        }
-      } catch (e) {
-        // Ignorar erro de parse
-      }
-    }
+    const triggers = await approachTriggersGenerator.generateContextualTriggers({
+      companyName: company.name,
+      sector: company.sector || undefined,
+      revenue: company.revenue || undefined,
+      employees: company.employees || undefined,
+      jobTitle: `${mainJobTitle} (${allJobTitles})`,
+      recentNews: recentNews.length > 0 ? recentNews : undefined,
+      upcomingEvents: upcomingEvents.length > 0 ? upcomingEvents : undefined,
+    })
 
-    return triggers.slice(0, 4) // Limitar a 4 triggers mais relevantes
+    console.log(`    ✅ ${triggers.length} gatilhos gerados`)
+    triggers.forEach((trigger, idx) => {
+      console.log(`       ${idx + 1}. ${trigger}`)
+    })
+
+    return triggers
   }
 
   /**

@@ -23,14 +23,28 @@ export interface EventDetectionResult {
 export class EventsDetectorService {
   private anthropic: Anthropic | null = null
   private serpApiKey: string | null = null
+  private initialized: boolean = false
 
   constructor() {
+    // Não inicializar aqui - fazer lazy init
+  }
+
+  /**
+   * Inicialização lazy - garante que .env está carregado
+   */
+  private ensureInitialized() {
+    if (this.initialized) return
+
     const apiKey = process.env.CLAUDE_API_KEY
     if (apiKey) {
       this.anthropic = new Anthropic({ apiKey })
+      console.log(`    [Event Detector] Anthropic cliente inicializado`)
+    } else {
+      console.error(`    [Event Detector] CLAUDE_API_KEY não encontrada no process.env`)
     }
 
     this.serpApiKey = process.env.BRIGHT_DATA_SERP_KEY || null
+    this.initialized = true
   }
 
   /**
@@ -48,12 +62,38 @@ export class EventsDetectorService {
   ): Promise<EventDetectionResult> {
     console.log(`\n [Event Detector] Detectando eventos: ${companyName}`)
 
+    // Garantir que está inicializado
+    this.ensureInitialized()
+
     if (!this.anthropic) {
-      console.log('    Claude API nao configurada')
+      console.error('    ❌ ERRO: Claude API nao configurada!')
+      console.error('    CLAUDE_API_KEY presente:', !!process.env.CLAUDE_API_KEY)
+      console.error('    process.env keys:', Object.keys(process.env).filter(k => k.includes('CLAUDE')))
       return { events: [], detectedAt: new Date(), sources: [] }
     }
 
     try {
+      console.log(`    🔍 Buscando noticias via Claude API com web search...`)
+
+      // Preparar informações de redes sociais
+      const socialMediaInfo: string[] = []
+      if (socialMedia?.instagram) {
+        socialMediaInfo.push(`Instagram: ${socialMedia.instagram}`)
+      }
+      if (socialMedia?.linkedin) {
+        socialMediaInfo.push(`LinkedIn: ${socialMedia.linkedin}`)
+      }
+      if (socialMedia?.twitter) {
+        socialMediaInfo.push(`Twitter: ${socialMedia.twitter}`)
+      }
+      if (socialMedia?.facebook) {
+        socialMediaInfo.push(`Facebook: ${socialMedia.facebook}`)
+      }
+
+      const socialMediaPrompt = socialMediaInfo.length > 0
+        ? `\n\nREDES SOCIAIS OFICIAIS DA EMPRESA:\n${socialMediaInfo.join('\n')}\nIMPORTANTE: Priorize buscar posts recentes nestas redes sociais para encontrar anúncios e notícias diretas da empresa.`
+        : ''
+
       // Usar Claude API com web search para buscar noticias e eventos
       const message = await this.anthropic.messages.create({
         model: 'claude-sonnet-4-5-20250929',
@@ -62,83 +102,129 @@ export class EventsDetectorService {
           {
             type: 'web_search_20250305',
             name: 'web_search',
-            max_uses: 3
+            max_uses: 7 // Aumentado para cobrir redes sociais também
           }
         ],
         messages: [
           {
             role: 'user',
-            content: `Encontre as 5 noticias ou eventos mais recentes e relevantes sobre a empresa "${companyName}" no Brasil.
+            content: `Encontre os eventos e notícias mais recentes e relevantes sobre a empresa "${companyName}" no Brasil.${socialMediaPrompt}
 
-INSTRUCOES:
-1. Use web_search para buscar noticias dos ultimos 30 dias
-2. Foque em eventos relevantes para prospecção B2B:
-   - Mudancas de lideranca (novo CEO, CFO, Diretor)
-   - Rodadas de investimento ou expansao
-   - Premios ou reconhecimentos
-   - Lancamentos de produtos importantes
-   - Participacao em eventos do setor
+PRIORIDADES DE BUSCA (em ordem de relevância para prospecção B2B):
+1. ALTA PRIORIDADE:
+   - Mudanças de liderança (novo CEO, CFO, Diretor Financeiro, Controller)
+   - Rodadas de investimento, aporte de capital, IPO
+   - Fusões, aquisições ou expansões significativas
+   - Prêmios ou reconhecimentos importantes do setor
 
-3. Retorne APENAS um JSON no formato:
+2. MÉDIA PRIORIDADE:
+   - Lançamentos de produtos/serviços relevantes
+   - Participação em eventos do setor (feiras, conferências)
+   - Abertura de novas unidades ou filiais
+   - Crescimento significativo de receita ou funcionários
+
+3. BAIXA PRIORIDADE (apenas se não houver eventos prioritários):
+   - Notícias corporativas gerais
+   - Campanhas de marketing
+
+FONTES PARA BUSCAR (use web_search):
+1. REDES SOCIAIS OFICIAIS (PRIORIDADE SE DISPONÍVEIS):
+   - Instagram da empresa (posts, stories salvos, anúncios)
+   - LinkedIn da empresa (posts, artigos, atualizações)
+   - Twitter/X da empresa (tweets recentes)
+   - Facebook da empresa (publicações, eventos)
+
+2. SITES DE NOTÍCIAS E PORTAIS:
+   - Sites de notícias financeiras (Valor Econômico, InfoMoney, Bloomberg Brasil)
+   - Portais de tecnologia e startups (NeoFeed, StartSe, B2B Stack)
+   - Site oficial da empresa (seção de notícias/imprensa)
+   - CVM (para empresas de capital aberto)
+
+FORMATO DE RETORNO (JSON):
 {
   "events": [
     {
       "type": "news|leadership_change|funding|award|product_launch|conference|expansion",
-      "title": "Titulo da noticia",
-      "description": "Resumo em ate 150 caracteres",
+      "title": "Título claro e objetivo (máx 80 caracteres)",
+      "description": "Resumo focado em como isso impacta a empresa (máx 150 caracteres)",
       "date": "YYYY-MM-DD",
-      "source": "Nome da fonte",
-      "sourceUrl": "URL da noticia",
+      "source": "Nome da fonte (ex: Valor Econômico, LinkedIn)",
+      "sourceUrl": "URL completa e verificada da notícia",
       "relevance": "high|medium|low",
       "sentiment": "positive|neutral|negative"
     }
   ]
 }
 
-4. Se nao encontrar noticias relevantes, retorne: {"events": []}
+REGRAS:
+- Priorize eventos dos últimos 60 dias
+- Retorne NO MÁXIMO 8 eventos (priorizando alta relevância)
+- Se não encontrar eventos relevantes, retorne: {"events": []}
+- SEMPRE inclua sourceUrl quando disponível
+- Para eventos futuros (conferências, lançamentos), use a data futura no campo "date"
 
 Empresa: ${companyName}`
           }
         ]
       })
 
+      console.log(`    ✅ Resposta recebida do Claude`)
+
       // Parse resposta
       for (const block of message.content) {
         if (block.type === 'text') {
           const text = block.text
+          console.log(`    📝 Resposta (primeiros 200 chars): ${text.substring(0, 200)}...`)
 
           // Buscar JSON na resposta
           const jsonMatch = text.match(/\{[\s\S]*"events"[\s\S]*\}/)
           if (jsonMatch) {
-            const response = JSON.parse(jsonMatch[0])
+            try {
+              const response = JSON.parse(jsonMatch[0])
 
-            const events: CompanyEvent[] = response.events.map((e: any) => ({
-              type: e.type || 'news',
-              title: e.title,
-              description: e.description,
-              date: e.date ? new Date(e.date) : new Date(),
-              source: e.source || 'Web Search',
-              sourceUrl: e.sourceUrl,
-              relevance: e.relevance || 'medium',
-              sentiment: e.sentiment || 'neutral'
-            }))
+              if (!response.events || !Array.isArray(response.events)) {
+                console.log(`    ⚠️  JSON invalido: events nao eh array`)
+                continue
+              }
 
-            console.log(`    ${events.length} eventos encontrados`)
+              const events: CompanyEvent[] = response.events.map((e: any) => ({
+                type: e.type || 'news',
+                title: e.title,
+                description: e.description,
+                date: e.date ? new Date(e.date) : new Date(),
+                source: e.source || 'Web Search',
+                sourceUrl: e.sourceUrl,
+                relevance: e.relevance || 'medium',
+                sentiment: e.sentiment || 'neutral'
+              }))
 
-            return {
-              events,
-              detectedAt: new Date(),
-              sources: ['Claude AI + Web Search']
+              console.log(`    ✅ ${events.length} eventos encontrados`)
+
+              return {
+                events,
+                detectedAt: new Date(),
+                sources: ['Claude AI + Web Search']
+              }
+            } catch (parseError) {
+              console.error(`    ❌ Erro ao parsear JSON:`, parseError)
+              console.error(`    JSON tentado:`, jsonMatch[0].substring(0, 300))
             }
+          } else {
+            console.log(`    ⚠️  Nenhum JSON encontrado na resposta`)
           }
         }
       }
 
-      console.log('    Nenhum evento encontrado')
+      console.log('    ❌ Nenhum evento encontrado apos processar resposta')
       return { events: [], detectedAt: new Date(), sources: [] }
 
     } catch (error) {
-      console.error('    Erro ao detectar eventos:', error)
+      console.error('    ❌ ERRO ao detectar eventos:')
+      console.error('    Tipo:', error instanceof Error ? error.constructor.name : typeof error)
+      console.error('    Mensagem:', error instanceof Error ? error.message : String(error))
+      if (error instanceof Error && error.stack) {
+        console.error('    Stack:', error.stack.split('\n').slice(0, 3).join('\n'))
+      }
       return { events: [], detectedAt: new Date(), sources: [] }
     }
   }

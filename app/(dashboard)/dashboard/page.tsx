@@ -134,7 +134,6 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Contatados</CardTitle>
-            <span className="text-2xl">📞</span>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.contacted}</div>

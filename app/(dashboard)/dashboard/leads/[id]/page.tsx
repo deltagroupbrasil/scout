@@ -400,20 +400,37 @@ export default function LeadDetailPage() {
             companyName={lead.company.name}
           />
 
-          {/* Sócios e Contatos Corporativos */}
-          <PartnersCard
-            partnersJson={lead.company.partners}
-            companyPhones={lead.company.companyPhones}
-            companyEmails={lead.company.companyEmails}
-            companyWhatsApp={lead.company.companyWhatsApp}
-          />
-
           {/* Eventos e Notícias */}
           <CompanyEventsCard
             recentNewsJson={lead.company.recentNews}
             upcomingEventsJson={lead.company.upcomingEvents}
             eventsDetectedAt={lead.company.eventsDetectedAt}
           />
+
+          {/* Gatilhos de Abordagem */}
+          {triggers.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <span>💡</span>
+                  Gatilhos de Abordagem
+                </CardTitle>
+                <CardDescription>
+                  Insights contextualizados baseados em eventos e dados da empresa
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3">
+                  {triggers.map((trigger, idx) => (
+                    <li key={idx} className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <span className="text-blue-600 mt-0.5 font-bold">{idx + 1}.</span>
+                      <span className="text-sm text-gray-800 leading-relaxed">{trigger}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Notas e Histórico */}
           <Card>
@@ -464,16 +481,24 @@ export default function LeadDetailPage() {
 
         {/* Coluna Lateral */}
         <div className="space-y-6">
-          {/* Decisores Identificados */}
+          {/* Sócios e Decisores (dados verificados - prioridade) */}
+          <PartnersCard
+            partnersJson={lead.company.partners}
+            companyPhones={lead.company.companyPhones}
+            companyEmails={lead.company.companyEmails}
+            companyWhatsApp={lead.company.companyWhatsApp}
+          />
+
+          {/* Outros Possíveis Contatos (sugeridos por IA - menos precisos) */}
           {suggestedContacts.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <User className="h-5 w-5" />
-                  Decisores Identificados
+                  Outros Possíveis Contatos
                 </CardTitle>
                 <CardDescription>
-                  Sugeridos por IA e fontes públicas
+                  Estimados por IA - validar antes de usar
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -527,26 +552,6 @@ export default function LeadDetailPage() {
                     {idx < suggestedContacts.length - 1 && <hr className="mt-4" />}
                   </div>
                 ))}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Gatilhos de Abordagem */}
-          {triggers.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle> Gatilhos de Abordagem</CardTitle>
-                <CardDescription>Insights gerados por IA</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  {triggers.map((trigger, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="text-green-600 mt-1">✓</span>
-                      <span className="text-sm">{trigger}</span>
-                    </li>
-                  ))}
-                </ul>
               </CardContent>
             </Card>
           )}
