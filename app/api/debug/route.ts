@@ -11,14 +11,7 @@ export async function GET() {
 
     // Verificar se usuário admin existe
     const adminUser = await prisma.user.findUnique({
-      where: { email: 'admin@leapscout.com' },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        isActive: true,
-        password: true // vamos ver o hash
-      }
+      where: { email: 'admin@leapscout.com' }
     })
 
     return NextResponse.json({
@@ -27,10 +20,9 @@ export async function GET() {
         connected: true,
         userCount,
         adminExists: !!adminUser,
-        adminUser: adminUser ? {
-          ...adminUser,
-          passwordHash: adminUser.password.substring(0, 20) + '...'
-        } : null
+        adminEmail: adminUser?.email || null,
+        adminId: adminUser?.id || null,
+        passwordHashPreview: adminUser ? adminUser.password.substring(0, 20) + '...' : null
       },
       env: {
         DATABASE_URL: process.env.DATABASE_URL ? 'SET (length: ' + process.env.DATABASE_URL.length + ')' : 'NOT SET',
