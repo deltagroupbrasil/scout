@@ -1198,20 +1198,25 @@ export class LeadOrchestratorService {
     let publicJobs: LinkedInJobData[] = []
     const totalJobs = allLinkedInJobs.length + indeedJobs.length + glassdoorJobs.length + gupyJobs.length + cathoJobs.length
 
+    console.log(`\n📊 Total de vagas encontradas até agora: ${totalJobs}`)
+
     if (totalJobs < 5) {
-      console.log(`\n  Poucas vagas encontradas (${totalJobs}), ativando FALLBACK PÚBLICO...`)
+      console.log(`\n⚠️  Poucas vagas encontradas (${totalJobs}), ativando FALLBACK PÚBLICO...`)
       publicJobs = await publicScraper.scrapeJobs(query).catch(err => {
         console.error('[PublicScraper] Erro:', err)
         return []
       })
 
+      console.log(` Fallback público retornou ${publicJobs.length} vagas`)
+
       // Se ainda assim não encontrou nada, usar fallback de empresas reais
       if (publicJobs.length === 0) {
-        console.log(' Usando fallback de empresas reais brasileiras')
+        console.log(' ⚠️  Nenhuma vaga via scraping público, usando fallback de empresas reais brasileiras')
         publicJobs = publicScraper.getFallbackJobs(query)
+        console.log(` Fallback de empresas reais retornou ${publicJobs.length} vagas`)
       }
-
-      console.log(` Fallback público retornou ${publicJobs.length} vagas\n`)
+    } else {
+      console.log(' ✅ Vagas suficientes encontradas, não é necessário fallback')
     }
 
     // Combinar todos os jobs
