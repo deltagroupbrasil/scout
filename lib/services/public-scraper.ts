@@ -45,59 +45,91 @@ export class PublicScraperService {
   }
 
   /**
-   * LinkedIn Jobs RSS Feed (público, não requer autenticação)
+   * LinkedIn Jobs API pública (sem autenticação)
+   * Usa o endpoint público do LinkedIn que retorna JSON
    */
   private async scrapeLinkedInRSS(query: string, location: string): Promise<LinkedInJobData[]> {
-    // LinkedIn permite RSS público de vagas
-    // https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=controller&location=brazil
+    // LinkedIn Jobs API pública - endpoint atualizado
+    const keywords = encodeURIComponent(query)
+    const geoId = '106057199' // Brasil
+    const url = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${keywords}&location=${encodeURIComponent(location)}&geoId=${geoId}&f_TPR=r86400&start=0&count=25`
 
-    const url = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${encodeURIComponent(query)}&location=${encodeURIComponent(location)}&start=0`
+    console.log('[LinkedIn API] URL:', url)
 
     try {
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Referer': 'https://www.linkedin.com/',
         },
       })
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
+        console.error('[LinkedIn API] HTTP', response.status, response.statusText)
+        return []
       }
 
       const html = await response.text()
+
+      if (!html || html.length < 100) {
+        console.error('[LinkedIn API] Resposta vazia ou muito curta')
+        return []
+      }
+
       const $ = cheerio.load(html)
       const jobs: LinkedInJobData[] = []
 
-      $('li').each((_, element) => {
+      // Procurar por cards de vagas (múltiplos seletores para maior compatibilidade)
+      const jobCards = $('.base-card, .job-search-card, [data-entity-urn]').toArray()
+
+      console.log(`[LinkedIn API] Encontrados ${jobCards.length} cards de vagas`)
+
+      for (const element of jobCards) {
         try {
           const $job = $(element)
 
-          const title = $job.find('h3, .base-search-card__title').text().trim()
-          const company = $job.find('.base-search-card__subtitle, h4').first().text().trim()
-          const location = $job.find('.job-search-card__location').text().trim()
-          const link = $job.find('a').first().attr('href')
-          const jobId = link?.match(/\/(\d+)\//)?.[1]
+          // Título da vaga
+          let title = $job.find('.base-search-card__title, h3.base-search-card__title').text().trim()
+          if (!title) title = $job.find('h3, .job-search-card__title').text().trim()
 
-          if (title && company && jobId) {
+          // Nome da empresa
+          let company = $job.find('.base-search-card__subtitle, h4.base-search-card__subtitle').text().trim()
+          if (!company) company = $job.find('h4, .job-search-card__subtitle').text().trim()
+
+          // Localização
+          let jobLocation = $job.find('.job-search-card__location, .base-search-card__location').text().trim()
+          if (!jobLocation) jobLocation = location
+
+          // Link da vaga
+          let link = $job.find('a.base-card__full-link, a').first().attr('href')
+          if (!link) link = $job.attr('href')
+
+          // Extrair ID da vaga
+          const jobId = link?.match(/\/jobs\/view\/(\d+)/)?.[1] || link?.match(/\/(\d+)/)?.[1]
+
+          if (title && company) {
             jobs.push({
               jobTitle: title,
               companyName: company,
-              location: location || 'Brasil',
-              jobUrl: `https://www.linkedin.com/jobs/view/${jobId}`,
-              description: `Vaga de ${title} na ${company}`,
+              location: jobLocation || 'Brasil',
+              jobUrl: jobId ? `https://www.linkedin.com/jobs/view/${jobId}` : (link || '#'),
+              description: `${title} - ${company}`,
               postedDate: new Date(),
-              jobSource: 'LinkedIn (Público)',
+              jobSource: 'LinkedIn',
             })
           }
         } catch (err) {
           // Ignorar erros de parsing individual
         }
-      })
+      }
 
+      console.log(`[LinkedIn API] Extraídas ${jobs.length} vagas válidas`)
       return jobs
+
     } catch (error) {
-      console.error('[PublicScraper] Erro LinkedIn RSS:', error)
+      console.error('[PublicScraper] Erro LinkedIn API:', error)
       return []
     }
   }
