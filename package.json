@@ -15,7 +15,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "npx prisma studio",
     "db:migrate": "npx prisma migrate dev",
-    "db:push": "npx prisma db push"
+    "db:push": "npx prisma db push",
+    "setup:prod": "npx tsx scripts/setup-production-db.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -33,6 +34,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@sentry/nextjs": "^10.25.0",
     "@tanstack/react-query": "^5.90.7",
+    "@types/pg": "^8.15.6",
     "@types/xml2js": "^0.4.14",
     "axios": "^1.13.2",
     "axios-retry": "^4.5.0",
@@ -51,6 +53,7 @@
     "next-auth": "^4.24.13",
     "p-queue": "^9.0.0",
     "p-retry": "^7.1.0",
+    "pg": "^8.16.3",
     "prisma": "^6.19.0",
     "puppeteer-core": "^24.29.1",
     "qrcode": "^1.5.4",
