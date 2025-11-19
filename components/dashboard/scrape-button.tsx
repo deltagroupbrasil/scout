@@ -32,7 +32,7 @@ export default function ScrapeButton({ onComplete, isAdmin = false }: ScrapeButt
 
       toast({
         title: "Buscando vagas...",
-        description: "Aguarde enquanto procuramos novas oportunidades (limite: 5 empresas)",
+        description: "Aguarde enquanto procuramos novas oportunidades (limite: 17 empresas)",
       })
 
       const response = await fetch('/api/scrape', {
@@ -42,7 +42,7 @@ export default function ScrapeButton({ onComplete, isAdmin = false }: ScrapeButt
         },
         body: JSON.stringify({
           query: 'Controller OR CFO OR "Gerente Financeiro" OR "Diretor Financeiro" OR Controladoria São Paulo',
-          maxCompanies: 5  // Reduzido para 5 para evitar timeout em serverless
+          maxCompanies: 17  // Mesmo limite das rotinas automáticas (4AM, 5AM, 6AM)
         }),
       })
 
