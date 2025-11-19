@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { leadOrchestrator } from '@/lib/services/lead-orchestrator'
 import { prisma } from '@/lib/prisma'
 
+// Vercel Fluid Compute: habilita timeout de 300s (5 minutos) no plano Hobby
+export const maxDuration = 300
+
 /**
  * Cron Job para scraping automatizado de leads
  *
@@ -52,11 +55,11 @@ export async function GET(request: NextRequest) {
     // Query para buscar vagas - termos específicos de Controladoria e BPO Financeiro
     const query = 'Controller OR CFO OR "Gerente Financeiro" OR "Diretor Financeiro" OR Controladoria São Paulo'
 
-    // Executar scraping com limite de 17 empresas (3x ao dia = 51 empresas)
-    // Plano Hobby do Vercel tem timeout de 10s, então dividimos em 3 execuções
+    // Executar scraping com limite de 50 empresas (1x ao dia às 6AM)
+    // Vercel Fluid Compute habilitado: maxDuration = 300s
     const result = await leadOrchestrator.scrapeAndProcessLeads({
       query,
-      maxCompanies: 17
+      maxCompanies: 50
     })
 
     const leadsCreated = result.savedLeads

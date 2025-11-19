@@ -32,7 +32,7 @@ export default function ScrapeButton({ onComplete, isAdmin = false }: ScrapeButt
 
       toast({
         title: "Buscando vagas...",
-        description: "Aguarde enquanto procuramos novas oportunidades (limite: 17 empresas)",
+        description: "Aguarde enquanto procuramos novas oportunidades (limite: 50 empresas)",
       })
 
       const response = await fetch('/api/scrape', {
@@ -42,7 +42,7 @@ export default function ScrapeButton({ onComplete, isAdmin = false }: ScrapeButt
         },
         body: JSON.stringify({
           query: 'Controller OR CFO OR "Gerente Financeiro" OR "Diretor Financeiro" OR Controladoria São Paulo',
-          maxCompanies: 17  // Plano Hobby: timeout de 10s
+          maxCompanies: 50  // Vercel Fluid Compute: 300s timeout
         }),
       })
 

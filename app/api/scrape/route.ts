@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { leadOrchestrator } from '@/lib/services/lead-orchestrator'
 
+// Vercel Fluid Compute: habilita timeout de 300s (5 minutos) no plano Hobby
+export const maxDuration = 300
+
 /**
  * API para executar scraping manualmente (para testes)
  * POST /api/scrape
