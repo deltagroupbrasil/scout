@@ -290,14 +290,23 @@ export class LeadOrchestratorService {
         candidateCount: j.candidateCount || j.applicants || null,
       }))
 
-      // 4. ENRIQUECIMENTO COMPLETO com IA
-      console.log(`\n Enriquecendo empresa com IA (Claude Sonnet 4.5)...`)
+      // 4. ENRIQUECIMENTO COMPLETO com IA (com cache inteligente)
+      const ENRICHMENT_CACHE_DAYS = 30
+      const shouldEnrich = !company.enrichedAt ||
+        (Date.now() - new Date(company.enrichedAt).getTime()) > (ENRICHMENT_CACHE_DAYS * 24 * 60 * 60 * 1000)
 
-      const aiData = await aiCompanyEnrichment.enrichCompany(
-        company.name,
-        company.sector || undefined,
-        company.website || undefined
-      )
+      let aiData: any = null
+      if (shouldEnrich) {
+        console.log(`\n Enriquecendo empresa com IA (Claude Sonnet 4.5)...`)
+        aiData = await aiCompanyEnrichment.enrichCompany(
+          company.name,
+          company.sector || undefined,
+          company.website || undefined
+        )
+      } else {
+        const daysSince = Math.floor((Date.now() - new Date(company.enrichedAt!).getTime()) / (24 * 60 * 60 * 1000))
+        console.log(`\n ⚡ Pulando enrichment IA (cache válido, enriquecido há ${daysSince} dias)`)
+      }
 
       // Atualizar empresa com dados da IA (incluindo setor)
       // TEMPORARIAMENTE DESABILITADO - AI Enrichment tem bugs de parsing

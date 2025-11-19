@@ -133,10 +133,19 @@ model Lead {
   notes            Note[]
   contactFeedbacks ContactFeedback[]
 
+  // Índices simples (mantidos para queries específicas)
   @@index([status])
   @@index([createdAt])
   @@index([companyId])
   @@index([assignedToId])
+
+  // Índices compostos otimizados (queries frequentes no dashboard)
+  @@index([status, createdAt])        // Dashboard: filtrar por status e ordenar por data
+  @@index([status, priorityScore])    // Dashboard: filtrar por status e ordenar por prioridade
+  @@index([companyId, status])        // Company page: leads de uma empresa por status
+  @@index([assignedToId, status])     // User page: leads atribuídos ao usuário por status
+  @@index([isNew, createdAt])         // Dashboard: destacar leads novos
+
   @@map("Lead")
 }
 

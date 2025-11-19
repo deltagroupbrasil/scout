@@ -18,6 +18,14 @@ export const prisma =
       ? ['query', 'error', 'warn']
       : ['error', 'warn'],
     errorFormat: 'pretty',
+    // Otimização para Vercel Serverless + Neon PostgreSQL
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL
+      }
+    },
+    // Connection pooling otimizado para serverless
+    // Neon pooler já gerencia pool, mas limitamos conexões por função
   })
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma

@@ -2,6 +2,7 @@ import { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { compare } from "bcryptjs"
 import { prisma } from "./prisma"
+import "./env-validator" // Validação de variáveis de ambiente
 
 export const authOptions: NextAuthOptions = {
   providers: [
