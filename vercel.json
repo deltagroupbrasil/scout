@@ -1,13 +1,13 @@
 {
-  "functions": {
-    "app/api/cron/scrape-leads/route.ts": {
-      "maxDuration": 300
-    },
-    "app/api/scrape/route.ts": {
-      "maxDuration": 300
-    }
-  },
   "crons": [
+    {
+      "path": "/api/cron/scrape-leads",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/scrape-leads",
+      "schedule": "0 5 * * *"
+    },
     {
       "path": "/api/cron/scrape-leads",
       "schedule": "0 6 * * *"

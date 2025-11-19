@@ -1152,7 +1152,7 @@ export class LeadOrchestratorService {
     errors: string[]
   }> {
     const startTime = Date.now()
-    const TIMEOUT_LIMIT = 280000 // 280 segundos (deixa 20s de margem para o Vercel completar response)
+    const TIMEOUT_LIMIT = 8000 // 8 segundos (plano Hobby: 10s total, deixa 2s de margem)
 
     const { query, maxCompanies = 20 } = options
     console.log(' Iniciando scraping de vagas de múltiplas fontes...')
