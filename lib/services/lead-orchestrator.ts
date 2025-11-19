@@ -359,58 +359,13 @@ export class LeadOrchestratorService {
         console.log(`   ✅ CNPJ já cadastrado: ${company.cnpj}`)
       }
 
-      // 5.2. Validar CNPJ e buscar sócios decisores via API Nova Vida TI (Congonhas)
-      console.log(`   📞 Validando CNPJ via API Congonhas...`)
-      try {
-        const novaVidaData = await novaVidaTIEnrichment.enrichCompanyContacts(
-          company.cnpj,
-          company.name
-        )
-
-        if (!novaVidaData) {
-          console.log(`   ❌ CNPJ inválido ou empresa não encontrada - DESCARTANDO`)
-          console.log(`   ⏭️  Pulando para próxima empresa...\n`)
-          return null // DESCARTAR: CNPJ não retornou dados válidos
-        }
-
-        console.log(`   ✅ Empresa validada: ${novaVidaData.razaoSocial}`)
-        console.log(`   ✅ ${novaVidaData.socios.length} sócio(s) encontrado(s)`)
-
-        // Pegar até 3 sócios mais relevantes
-        enrichedContacts = novaVidaData.socios.slice(0, 3).map((socio: any) => ({
-          name: socio.nome,
-          role: socio.qualificacao || 'Sócio',
-          email: socio.emails?.[0] || null,
-          phone: socio.telefones?.[0] || null,
-          linkedin: socio.linkedin || null,
-          source: 'novavidati'
-        }))
-
-        // Atualizar dados da empresa com faturamento e funcionários
-        const updates: any = {}
-        if (novaVidaData.qtdeFuncionarios && !company.employees) {
-          updates.employees = novaVidaData.qtdeFuncionarios
-          console.log(`   💼 Funcionários: ${novaVidaData.qtdeFuncionarios}`)
-        }
-        if (novaVidaData.capitalSocial && !company.revenue) {
-          updates.revenue = novaVidaData.capitalSocial * 5 // Estimativa: 5x capital social
-          console.log(`   💰 Faturamento estimado: R$ ${(updates.revenue / 1000000).toFixed(1)}M`)
-        }
-        if (Object.keys(updates).length > 0) {
-          await prisma.company.update({
-            where: { id: company.id },
-            data: updates
-          })
-          // Atualizar objeto local
-          company.employees = updates.employees || company.employees
-          company.revenue = updates.revenue || company.revenue
-        }
-
-      } catch (error) {
-        console.error(`   ❌ Erro ao validar CNPJ:`, error instanceof Error ? error.message : String(error))
-        console.log(`   ⏭️  Pulando para próxima empresa...\n`)
-        return null // DESCARTAR: erro ao validar CNPJ
-      }
+      // 5.2. API Nova Vida TI TEMPORARIAMENTE DESABILITADA (credenciais incorretas)
+      // TODO: Configurar variáveis de ambiente no Vercel:
+      // - NOVA_VIDA_TI_USUARIO
+      // - NOVA_VIDA_TI_SENHA
+      // - NOVA_VIDA_TI_CLIENTE
+      console.log(`   ⚠️  Nova Vida TI desabilitada (configurar credenciais no Vercel)`)
+      console.log(`   ℹ️  Prosseguindo com CNPJ validado por IA...`)
 
       console.log(`\n✅ Total de contatos encontrados: ${enrichedContacts.length}`)
 
