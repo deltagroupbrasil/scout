@@ -52,10 +52,11 @@ export async function GET(request: NextRequest) {
     // Query para buscar vagas - termos específicos de Controladoria e BPO Financeiro
     const query = 'Controller OR CFO OR "Gerente Financeiro" OR "Diretor Financeiro" OR Controladoria São Paulo'
 
-    // Executar scraping com limite de 17 empresas por execução (3x ao dia = 51 empresas)
+    // Executar scraping com limite de 50 empresas (1x ao dia às 6AM)
+    // Timeout configurado para 300s no vercel.json
     const result = await leadOrchestrator.scrapeAndProcessLeads({
       query,
-      maxCompanies: 17
+      maxCompanies: 50
     })
 
     const leadsCreated = result.savedLeads
