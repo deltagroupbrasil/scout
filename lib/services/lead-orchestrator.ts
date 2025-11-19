@@ -345,29 +345,36 @@ export class LeadOrchestratorService {
         const domain = websiteFinder.extractDomain(company.website)!
 
         // ESTRATÉGIA 1: LinkedIn People Scraper (prioridade 1 - perfis reais)
-        if (company.linkedinUrl) {
-          console.log(`\n📍 ESTRATÉGIA 1: LinkedIn People Scraper`)
-          console.log(`   🔗 LinkedIn Company: ${company.linkedinUrl}`)
+        // DESABILITADO: Puppeteer causa timeout em ambiente serverless (Vercel)
+        // Usar apenas ESTRATÉGIA 2 (Google People Finder) que é mais rápida e confiável
+        if (false && company.linkedinUrl) {
+          try {
+            console.log(`\n📍 ESTRATÉGIA 1: LinkedIn People Scraper`)
+            console.log(`   🔗 LinkedIn Company: ${company.linkedinUrl}`)
 
-          const linkedinPeople = await linkedInPeopleScraper.searchPeopleByRole(
-            company.name,
-            targetRoles
-          )
+            const linkedinPeople = await linkedInPeopleScraper.searchPeopleByRole(
+              company.name,
+              targetRoles
+            )
 
-          if (linkedinPeople.length > 0) {
-            console.log(` LinkedIn encontrou ${linkedinPeople.length} perfis`)
+            if (linkedinPeople.length > 0) {
+              console.log(` LinkedIn encontrou ${linkedinPeople.length} perfis`)
 
-            // Converter para formato SuggestedContact
-            const linkedinContacts = linkedinPeople.slice(0, 3).map(person => ({
-              name: person.name,
-              role: person.role,
-              email: null, // LinkedIn não expõe emails em busca
-              phone: null,
-              linkedin: person.linkedinUrl,
-              source: 'linkedin' as const,
-            }))
+              // Converter para formato SuggestedContact
+              const linkedinContacts = linkedinPeople.slice(0, 3).map(person => ({
+                name: person.name,
+                role: person.role,
+                email: null, // LinkedIn não expõe emails em busca
+                phone: null,
+                linkedin: person.linkedinUrl,
+                source: 'linkedin' as const,
+              }))
 
-            enrichedContacts = linkedinContacts
+              enrichedContacts = linkedinContacts
+            }
+          } catch (error) {
+            console.error(`    ⚠️  Erro ao buscar ${targetRoles.join(', ')}:`, error instanceof Error ? error.message : String(error))
+            console.log(`    ⏭️  Pulando para ESTRATÉGIA 2 (Google People Finder)`)
           }
         }
 
