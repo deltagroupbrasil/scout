@@ -372,9 +372,8 @@ export class LeadOrchestratorService {
 
               enrichedContacts = linkedinContacts
             }
-          } catch (err) {
-            const errorMsg = err instanceof Error ? err.message : String(err)
-            console.error(`    ⚠️  Erro ao buscar ${targetRoles.join(', ')}:`, errorMsg)
+          } catch (err: any) {
+            console.error(`    ⚠️  Erro ao buscar ${targetRoles.join(', ')}:`, err instanceof Error ? err.message : String(err))
             console.log(`    ⏭️  Pulando para ESTRATÉGIA 2 (Google People Finder)`)
           }
         }
