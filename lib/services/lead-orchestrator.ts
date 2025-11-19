@@ -1345,9 +1345,14 @@ export class LeadOrchestratorService {
       console.log(`   - Público (Fallback): ${publicJobs.length}`)
     }
 
-    // Filtrar vagas irrelevantes
-    const relevantJobs = allJobs.filter(job => this.isRelevantJob(job.jobTitle))
-    console.log(` Vagas relevantes após filtro: ${relevantJobs.length}`)
+    // Filtrar vagas irrelevantes (SEM logs individuais para não travar)
+    console.log(` Filtrando ${allJobs.length} vagas...`)
+    const relevantJobs = allJobs.filter(job => {
+      const isRelevant = this.isRelevantJob(job.jobTitle)
+      // Remover console.logs individuais para não gerar output excessivo
+      return isRelevant
+    })
+    console.log(` ✅ Filtro concluído: ${relevantJobs.length} vagas relevantes (${allJobs.length - relevantJobs.length} puladas)`)
 
     // AGRUPAR vagas por empresa e limitar a N empresas
     const jobsByCompany = new Map<string, LinkedInJobData[]>()
@@ -1460,7 +1465,7 @@ export class LeadOrchestratorService {
     )
 
     if (hasIrrelevantTerms) {
-      console.log(`⏭  Pulando vaga irrelevante: ${jobTitle}`)
+      // REMOVIDO: console.log causa travamento com muitas vagas
       return false
     }
 
@@ -1470,7 +1475,7 @@ export class LeadOrchestratorService {
     )
 
     if (!hasRelevantTerms) {
-      console.log(`⏭  Pulando vaga sem termos relevantes: ${jobTitle}`)
+      // REMOVIDO: console.log causa travamento com muitas vagas
       return false
     }
 
