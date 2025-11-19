@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge"
 
 interface ContactSourceBadgeProps {
-  source?: 'linkedin' | 'google' | 'website' | 'estimated' | 'congonhas_api'
+  source?: 'linkedin' | 'google' | 'website' | 'estimated' | 'congonhas_api' | 'novavidati'
   className?: string
 }
 
@@ -9,6 +9,11 @@ export default function ContactSourceBadge({ source, className }: ContactSourceB
   if (!source) return null
 
   const config = {
+    novavidati: {
+      label: 'SCOUT',
+      className: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+      icon: '🎯'
+    },
     congonhas_api: {
       label: 'Verificado - API',
       className: 'bg-green-100 text-green-800 border-green-300',
