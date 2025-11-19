@@ -36,37 +36,34 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('[Scrape API] 🚀 Iniciando scraping...')
+    console.log('[Scrape API] 🚀 Iniciando scraping SÍNCRONO...')
+    console.log(`[Scrape API] ⏱  Timeout configurado: ${maxDuration}s (Vercel Fluid Compute)`)
 
-    // SOLUÇÃO: Retornar resposta imediata e processar em background
-    // Isso evita o gateway timeout de 60s do Vercel Hobby
-    console.log('[Scrape API] ⚡ Processando em background para evitar gateway timeout')
-
-    // Iniciar processamento em background (sem await)
-    leadOrchestrator.scrapeAndProcessLeads({
+    // CRÍTICO: Em serverless, processamento DEVE ser síncrono (com await)
+    // Background processing (sem await) é ABORTADO quando a response é retornada
+    const result = await leadOrchestrator.scrapeAndProcessLeads({
       query,
       maxCompanies
-    }).then(result => {
-      const duration = Math.floor((Date.now() - startTime) / 1000)
-      console.log(`[Scrape API] ✅ Scraping concluído em ${duration}s`)
-      console.log(`[Scrape API] Resultado: ${result.savedLeads} leads, ${result.totalJobs} vagas totais`)
-
-      if (result.errors.length > 0) {
-        console.log(`[Scrape API] ⚠️  ${result.errors.length} erros:`)
-        result.errors.forEach((err, i) => console.log(`  ${i + 1}. ${err}`))
-      }
-    }).catch(error => {
-      console.error('[Scrape API] ❌ Erro no processamento em background:', error)
     })
 
-    // Retornar resposta imediata
+    const duration = Math.floor((Date.now() - startTime) / 1000)
+    console.log(`[Scrape API] ✅ Scraping concluído em ${duration}s`)
+    console.log(`[Scrape API] Resultado: ${result.savedLeads} leads salvos, ${result.totalJobs} vagas totais`)
+
+    if (result.errors.length > 0) {
+      console.log(`[Scrape API] ⚠️  ${result.errors.length} erros:`)
+      result.errors.forEach((err, i) => console.log(`  ${i + 1}. ${err}`))
+    }
+
+    // Retornar resultado final
     return NextResponse.json({
       success: true,
-      message: `Scraping iniciado com sucesso! Processando ${maxCompanies} empresas em background...`,
-      status: 'processing',
-      query,
-      maxCompanies,
-      info: 'O processamento continua em background. Atualize o dashboard para ver os novos leads.'
+      message: `Scraping concluído! ${result.savedLeads} leads salvos de ${result.totalJobs} vagas encontradas.`,
+      status: 'completed',
+      savedLeads: result.savedLeads,
+      totalJobs: result.totalJobs,
+      duration,
+      errors: result.errors
     })
   } catch (error) {
     const duration = Math.floor((Date.now() - startTime) / 1000)
