@@ -71,7 +71,9 @@
       "Bash(set -o allexport)",
       "Bash(source .env.production)",
       "Bash(set:*)",
-      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_PL4yEHAcdvQ5@ep-calm-meadow-ady4ssjy-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require\" npx tsx:*)"
+      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_PL4yEHAcdvQ5@ep-calm-meadow-ady4ssjy-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require\" npx tsx:*)",
+      "Bash(BRIGHT_DATA_UNLOCKER_KEY=\"eaa8204358199b680e57a721be02c161468cc57ad08a550e7aa219f1cbbc42e3\" npx tsx:*)",
+      "WebFetch(domain:vercel.com)"
     ],
     "deny": [],
     "ask": []
