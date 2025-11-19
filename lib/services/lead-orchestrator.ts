@@ -1173,37 +1173,58 @@ export class LeadOrchestratorService {
     console.log(`⚙  Limite: ${maxCompanies} empresas`)
     console.log(`⏱  Timeout configurado: ${TIMEOUT_LIMIT/1000}s`)
 
-    // Buscar em múltiplas localizações para ter mais resultados
+    // EXPANSÃO: Múltiplas queries para cobrir mais tipos de vagas
+    const queries = [
+      query, // Query original do usuário
+      'Controller Financeiro São Paulo',
+      'CFO Brasil',
+      'Gerente Financeiro',
+      'Diretor Financeiro',
+      'Analista Controladoria Sênior',
+    ]
+
+    // EXPANSÃO: Mais localizações brasileiras (top 10 + nacional)
     const locations = [
-      'São Paulo, Brazil',
-      'Rio de Janeiro, Brazil',
-      'Belo Horizonte, Brazil',
-      'Curitiba, Brazil',
-      'Porto Alegre, Brazil',
-      'Brasília, Brazil',
+      'São Paulo, SP',
+      'Rio de Janeiro, RJ',
+      'Belo Horizonte, MG',
+      'Curitiba, PR',
+      'Porto Alegre, RS',
+      'Brasília, DF',
+      'Recife, PE',
+      'Fortaleza, CE',
+      'Salvador, BA',
+      'Campinas, SP',
       'Brazil', // Busca nacional
     ]
 
-    // Scraping de todas as fontes em paralelo com múltiplas localizações
-    console.log(`📍 Buscando em ${locations.length} localizações...`)
+    // Scraping de todas as fontes em paralelo com múltiplas localizações E queries
+    console.log(`📍 Buscando ${queries.length} queries em ${locations.length} localizações...`)
 
     const allLinkedInJobs: LinkedInJobData[] = []
 
     // SEMPRE usar API pública (Puppeteer não funciona em Vercel)
     console.log('🌐 Usando LinkedIn API Pública (compatível com serverless)')
     try {
-      // Buscar em múltiplas localizações via API pública
-      for (const location of locations.slice(0, 3)) { // Limitar a 3 localizações para não sobrecarregar
-        try {
-          console.log(` LinkedIn Público: ${location}`)
-          const jobs = await publicScraper.scrapeJobs(query, location)
-          allLinkedInJobs.push(...jobs)
-          console.log(`   → ${jobs.length} vagas encontradas`)
-          await this.sleep(1000) // Delay entre buscas
-        } catch (err) {
-          console.error(`[LinkedIn Público ${location}] Erro:`, err)
+      // ESTRATÉGIA: Combinar queries + localizações para máxima cobertura
+      // Usar 2 queries principais × 3 localizações principais = 6 buscas
+      const topQueries = queries.slice(0, 2) // Query original + Controller
+      const topLocations = locations.slice(0, 3) // SP, RJ, MG
+
+      for (const searchQuery of topQueries) {
+        for (const location of topLocations) {
+          try {
+            console.log(` LinkedIn: "${searchQuery}" em ${location}`)
+            const jobs = await publicScraper.scrapeJobs(searchQuery, location)
+            allLinkedInJobs.push(...jobs)
+            console.log(`   → ${jobs.length} vagas`)
+            await this.sleep(800) // Delay entre buscas
+          } catch (err) {
+            console.error(`[LinkedIn ${location}] Erro:`, err)
+          }
         }
       }
+
       console.log(` Total LinkedIn: ${allLinkedInJobs.length} vagas`)
     } catch (err) {
       console.error('[LinkedIn Público] Erro:', err)

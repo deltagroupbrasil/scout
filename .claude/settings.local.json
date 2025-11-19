@@ -67,7 +67,11 @@
       "Bash(git config:*)",
       "Bash(psql \"postgresql://neondb_owner:npg_PL4yEHAcdvQ5@ep-calm-meadow-ady4ssjy-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require\" -c \"\\dt\")",
       "Bash(winget install:*)",
-      "Bash(neonctl:*)"
+      "Bash(neonctl:*)",
+      "Bash(set -o allexport)",
+      "Bash(source .env.production)",
+      "Bash(set:*)",
+      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_PL4yEHAcdvQ5@ep-calm-meadow-ady4ssjy-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require\" npx tsx:*)"
     ],
     "deny": [],
     "ask": []
