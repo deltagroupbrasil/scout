@@ -488,6 +488,7 @@ export class LeadOrchestratorService {
     }
 
     console.log(` Criando nova empresa: ${companyName}`)
+    const companyCreationStartTime = Date.now()
 
     // ============================================================================
     // NOVO PIPELINE OTIMIZADO (Baixo Custo)
