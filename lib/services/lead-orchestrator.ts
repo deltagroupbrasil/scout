@@ -659,15 +659,28 @@ export class LeadOrchestratorService {
     }
 
     // 5. Enriquecer dados de sócios (OpenCNPJ + Nova Vida TI)
+    const partnersStartTime = Date.now()
     if (company.cnpj) {
       await this.enrichPartnersData(company)
     }
+    const partnersTime = Date.now() - partnersStartTime
+    console.log(`    ⏱️  Tempo enriquecimento sócios: ${(partnersTime/1000).toFixed(2)}s`)
 
     // 6. Enriquecer com IA (CNPJ, revenue, employees, setor)
+    const aiEnrichStartTime = Date.now()
     await this.enrichCompanyWithAI(company.id, companyName, company.sector, company.website)
+    const aiEnrichTime = Date.now() - aiEnrichStartTime
+    console.log(`    ⏱️  Tempo enriquecimento IA: ${(aiEnrichTime/1000).toFixed(2)}s`)
 
     // 7. Detectar eventos e notícias da empresa
+    const eventsStartTime = Date.now()
     await this.detectCompanyEvents(company.id, companyName)
+    const eventsTime = Date.now() - eventsStartTime
+    console.log(`    ⏱️  Tempo detecção eventos: ${(eventsTime/1000).toFixed(2)}s`)
+
+    const totalCompanyTime = Date.now() - companyCreationStartTime
+    console.log(`\n    ✅ TEMPO TOTAL DA EMPRESA: ${(totalCompanyTime/1000).toFixed(2)}s`)
+    console.log(`    Breakdown: Sócios ${(partnersTime/1000).toFixed(1)}s + IA ${(aiEnrichTime/1000).toFixed(1)}s + Eventos ${(eventsTime/1000).toFixed(1)}s`)
 
     return company
   }
