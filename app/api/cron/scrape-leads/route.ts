@@ -52,10 +52,10 @@ export async function GET(request: NextRequest) {
     // Query para buscar vagas - termos específicos de Controladoria e BPO Financeiro
     const query = 'Controller OR CFO OR "Gerente Financeiro" OR "Diretor Financeiro" OR Controladoria São Paulo'
 
-    // Executar scraping com limite de 20 empresas
+    // Executar scraping com limite de 17 empresas (~50 vagas baseado em 3 vagas/empresa)
     const result = await leadOrchestrator.scrapeAndProcessLeads({
       query,
-      maxCompanies: 20
+      maxCompanies: 17
     })
 
     const leadsCreated = result.savedLeads
