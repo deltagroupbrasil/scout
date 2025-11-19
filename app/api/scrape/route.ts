@@ -38,30 +38,35 @@ export async function POST(request: NextRequest) {
 
     console.log('[Scrape API] 🚀 Iniciando scraping...')
 
-    // Executar scraping com limite de empresas
-    const result = await leadOrchestrator.scrapeAndProcessLeads({
+    // SOLUÇÃO: Retornar resposta imediata e processar em background
+    // Isso evita o gateway timeout de 60s do Vercel Hobby
+    console.log('[Scrape API] ⚡ Processando em background para evitar gateway timeout')
+
+    // Iniciar processamento em background (sem await)
+    leadOrchestrator.scrapeAndProcessLeads({
       query,
       maxCompanies
+    }).then(result => {
+      const duration = Math.floor((Date.now() - startTime) / 1000)
+      console.log(`[Scrape API] ✅ Scraping concluído em ${duration}s`)
+      console.log(`[Scrape API] Resultado: ${result.savedLeads} leads, ${result.totalJobs} vagas totais`)
+
+      if (result.errors.length > 0) {
+        console.log(`[Scrape API] ⚠️  ${result.errors.length} erros:`)
+        result.errors.forEach((err, i) => console.log(`  ${i + 1}. ${err}`))
+      }
+    }).catch(error => {
+      console.error('[Scrape API] ❌ Erro no processamento em background:', error)
     })
 
-    const duration = Math.floor((Date.now() - startTime) / 1000)
-
-    console.log(`[Scrape API] ✅ Scraping concluído em ${duration}s`)
-    console.log(`[Scrape API] Resultado: ${result.savedLeads} leads, ${result.totalJobs} vagas totais`)
-
-    if (result.errors.length > 0) {
-      console.log(`[Scrape API] ⚠️  ${result.errors.length} erros:`)
-      result.errors.forEach((err, i) => console.log(`  ${i + 1}. ${err}`))
-    }
-
+    // Retornar resposta imediata
     return NextResponse.json({
       success: true,
-      message: `${result.savedLeads} leads processados com sucesso`,
-      count: result.savedLeads,
-      totalJobs: result.totalJobs,
-      companiesProcessed: result.companiesProcessed,
-      errors: result.errors,
-      duration
+      message: `Scraping iniciado com sucesso! Processando ${maxCompanies} empresas em background...`,
+      status: 'processing',
+      query,
+      maxCompanies,
+      info: 'O processamento continua em background. Atualize o dashboard para ver os novos leads.'
     })
   } catch (error) {
     const duration = Math.floor((Date.now() - startTime) / 1000)
