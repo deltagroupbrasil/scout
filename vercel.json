@@ -2,6 +2,14 @@
   "crons": [
     {
       "path": "/api/cron/scrape-leads",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/scrape-leads",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/scrape-leads",
       "schedule": "0 6 * * *"
     }
   ]
