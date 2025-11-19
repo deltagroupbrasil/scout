@@ -1,11 +1,13 @@
 // Lead Orchestrator - Orquestra todo o processo de criação de leads
 import { prisma } from "@/lib/prisma"
 import { linkedInScraper } from "./linkedin-scraper"
+import { linkedInPuppeteerScraper } from "./linkedin-puppeteer-scraper"
 import { gupyScraper } from "./gupy-scraper"
 import { cathoScraper } from "./catho-scraper"
 import { indeedScraper } from "./indeed-scraper"
 import { glassdoorScraper } from "./glassdoor-scraper"
 import { publicScraper } from "./public-scraper"
+import { serpApi } from "./serp-api"
 import { companyEnrichment } from "./company-enrichment"
 import { aiInsights } from "./ai-insights"
 import { aiCompanyEnrichment } from "./ai-company-enrichment"
@@ -1225,10 +1227,38 @@ export class LeadOrchestratorService {
         }
       }
 
-      console.log(` Total LinkedIn: ${allLinkedInJobs.length} vagas`)
+      console.log(` Total LinkedIn API Pública: ${allLinkedInJobs.length} vagas`)
     } catch (err) {
       console.error('[LinkedIn Público] Erro:', err)
     }
+
+    // PUPPETEER: LinkedIn via browser real (produção apenas)
+    const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
+    if (isProduction) {
+      console.log('\n🎭 Tentando Puppeteer LinkedIn (browser real)...')
+      try {
+        const puppeteerJobs = await linkedInPuppeteerScraper.scrapeJobs(
+          queries[0], // Usar primeira query
+          locations[0] // São Paulo
+        )
+        allLinkedInJobs.push(...puppeteerJobs)
+        console.log(` Puppeteer adicionou ${puppeteerJobs.length} vagas`)
+      } catch (err) {
+        console.error('[Puppeteer] Erro (continuando sem ele):', err)
+      }
+    }
+
+    // SERP API: Descobrir mais fontes via Google
+    console.log('\n🔍 Tentando SERP API (Google search)...')
+    try {
+      const serpJobs = await serpApi.searchJobs(query, 'linkedin.com/jobs')
+      allLinkedInJobs.push(...serpJobs)
+      console.log(` SERP API encontrou ${serpJobs.length} vagas`)
+    } catch (err) {
+      console.error('[SERP API] Erro (continuando sem ele):', err)
+    }
+
+    console.log(`\n📊 Total LinkedIn (todos os métodos): ${allLinkedInJobs.length} vagas`)
 
     // Outras fontes brasileiras (prioridade: Indeed, Glassdoor, Gupy, Catho)
     const [indeedJobs, glassdoorJobs, gupyJobs, cathoJobs] = await Promise.all([
@@ -1257,10 +1287,10 @@ export class LeadOrchestratorService {
     console.log(`\n📊 Total de vagas encontradas até agora: ${totalJobs}`)
 
     // SEMPRE ativar fallback em produção para garantir resultados
-    const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
+    const isProd = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
 
-    if (isProduction || totalJobs < 5) {
-      console.log(`\n⚠️  ${isProduction ? 'PRODUÇÃO: Ativando' : 'Poucas vagas, ativando'} FALLBACK PÚBLICO...`)
+    if (isProd || totalJobs < 5) {
+      console.log(`\n⚠️  ${isProd ? 'PRODUÇÃO: Ativando' : 'Poucas vagas, ativando'} FALLBACK PÚBLICO...`)
 
       try {
         publicJobs = await publicScraper.scrapeJobs(query).catch(err => {
