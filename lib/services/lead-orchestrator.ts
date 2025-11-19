@@ -333,97 +333,88 @@ export class LeadOrchestratorService {
         where: { id: company.id }
       })
 
-      // 5. Buscar PESSOAS REAIS (Google + Apollo.io)
-      console.log(`\n Buscando pessoas REAIS (Google + Apollo)...`)
+      // 5. FLUXO OTIMIZADO: CNPJ → API Nova Vida TI → Sócios Decisores
+      console.log(`\n⚡ FLUXO RÁPIDO: CNPJ → Sócios Decisores...`)
 
       let enrichedContacts: any[] = []
       let triggers: string[] = []
 
-      const targetRoles = this.extractTargetRoles(mainJob.jobTitle)
-
-      if (company.website && websiteFinder.extractDomain(company.website)) {
-        const domain = websiteFinder.extractDomain(company.website)!
-
-        // ESTRATÉGIA 1: LinkedIn People Scraper (prioridade 1 - perfis reais)
-        // DESABILITADO: Puppeteer causa timeout em ambiente serverless (Vercel)
-        // Usar apenas ESTRATÉGIA 2 (Google People Finder) que é mais rápida e confiável
-        if (false && company.linkedinUrl) {
-          try {
-            console.log(`\n📍 ESTRATÉGIA 1: LinkedIn People Scraper`)
-            console.log(`   🔗 LinkedIn Company: ${company.linkedinUrl}`)
-
-            const linkedinPeople = await linkedInPeopleScraper.searchPeopleByRole(
-              company.name,
-              targetRoles
-            )
-
-            if (linkedinPeople.length > 0) {
-              console.log(` LinkedIn encontrou ${linkedinPeople.length} perfis`)
-
-              // Converter para formato SuggestedContact
-              const linkedinContacts = linkedinPeople.slice(0, 3).map(person => ({
-                name: person.name,
-                role: person.role,
-                email: null, // LinkedIn não expõe emails em busca
-                phone: null,
-                linkedin: person.linkedinUrl,
-                source: 'linkedin' as const,
-              }))
-
-              enrichedContacts = linkedinContacts
-            }
-          } catch (err: any) {
-            console.error(`    ⚠️  Erro ao buscar ${targetRoles.join(', ')}:`, err instanceof Error ? err.message : String(err))
-            console.log(`    ⏭️  Pulando para ESTRATÉGIA 2 (Google People Finder)`)
-          }
+      // 5.1. Buscar CNPJ se não tiver
+      if (!company.cnpj) {
+        console.log(`   🔍 Buscando CNPJ para ${company.name}...`)
+        const cnpj = await cnpjFinder.findCNPJByName(company.name)
+        if (cnpj) {
+          await prisma.company.update({
+            where: { id: company.id },
+            data: { cnpj }
+          })
+          company.cnpj = cnpj
+          console.log(`   ✅ CNPJ encontrado: ${cnpj}`)
+        } else {
+          console.log(`   ⚠️  CNPJ não encontrado`)
         }
+      } else {
+        console.log(`   ✅ CNPJ já cadastrado: ${company.cnpj}`)
+      }
 
-        // ESTRATÉGIA 2: Google People Finder (fallback)
-        if (enrichedContacts.length === 0) {
-          console.log(`\n📍 ESTRATÉGIA 2: Google People Finder`)
-          const realPeople = await googlePeopleFinder.findRealPeople(
-            company.name,
-            company.website,
-            targetRoles
+      // 5.2. Se tem CNPJ, buscar sócios decisores via API Nova Vida TI
+      if (company.cnpj) {
+        console.log(`   📞 Buscando sócios decisores via API Congonhas...`)
+        try {
+          const novaVidaData = await novaVidaTIEnrichment.enrichCompanyContacts(
+            company.cnpj,
+            company.name
           )
 
-          if (realPeople.length > 0) {
-            const peopleWithContact = realPeople.filter(person => {
-              const hasValidEmail = person.email && this.isValidBusinessEmail(person.email)
-              const hasValidPhone = person.phone && person.phone.length > 8
-              return hasValidEmail || hasValidPhone
-            })
+          if (novaVidaData) {
+            console.log(`   ✅ ${novaVidaData.socios.length} sócio(s) encontrado(s)`)
 
-            if (peopleWithContact.length > 0) {
-              const bestPeople = peopleWithContact
-                .sort((a, b) => {
-                  const scoreA = this.calculateContactScore(a)
-                  const scoreB = this.calculateContactScore(b)
-                  return scoreB - scoreA
-                })
-                .slice(0, 3)
+            // Pegar até 3 sócios mais relevantes
+            enrichedContacts = novaVidaData.socios.slice(0, 3).map((socio: any) => ({
+              name: socio.nome,
+              role: socio.qualificacao || 'Sócio',
+              email: socio.emails?.[0] || null,
+              phone: socio.telefones?.[0] || null,
+              linkedin: socio.linkedin || null,
+              source: 'novavidati'
+            }))
 
-              enrichedContacts = bestPeople.map(person => ({
-                name: person.name,
-                role: person.role,
-                email: person.email || null,
-                phone: person.phone || null,
-                linkedin: person.linkedinUrl || null,
-                source: person.source || 'google', // Marca a fonte do contato
-              }))
+            // Atualizar dados da empresa com faturamento e funcionários se disponível
+            const updates: any = {}
+            if (novaVidaData.qtdeFuncionarios && !company.employees) {
+              updates.employees = novaVidaData.qtdeFuncionarios
+              console.log(`   💼 Funcionários: ${novaVidaData.qtdeFuncionarios}`)
             }
+            if (novaVidaData.capitalSocial && !company.revenue) {
+              updates.revenue = novaVidaData.capitalSocial * 5 // Estimativa: 5x capital social
+              console.log(`   💰 Faturamento estimado: R$ ${(updates.revenue / 1000000).toFixed(1)}M`)
+            }
+            if (Object.keys(updates).length > 0) {
+              await prisma.company.update({
+                where: { id: company.id },
+                data: updates
+              })
+            }
+          } else {
+            console.log(`   ⚠️  Nenhum dado encontrado`)
           }
-        }
-
-        // ESTRATÉGIA 3: Contatos Estimados Inteligentes (baseado no porte)
-        if (enrichedContacts.length === 0) {
-          console.log(`\n📍 ESTRATÉGIA 3: Geração de contatos estimados`)
-          enrichedContacts = this.generateSmartContacts(company, mainJob.jobTitle, domain)
-          console.log(` ${enrichedContacts.length} contatos estimados gerados`)
+        } catch (error) {
+          console.error(`   ❌ Erro ao buscar sócios:`, error instanceof Error ? error.message : String(error))
         }
       }
 
-      console.log(`\n Total de contatos encontrados: ${enrichedContacts.length}`)
+      // 5.3. Fallback: Gerar contatos estimados inteligentes se não encontrou ninguém
+      if (enrichedContacts.length === 0 && company.website) {
+        console.log(`   📝 Gerando contatos estimados...`)
+        const domain = websiteFinder.extractDomain(company.website)
+        if (domain) {
+          const targetRoles = this.extractTargetRoles(mainJob.jobTitle)
+          enrichedContacts = this.generateSmartContacts(company, mainJob.jobTitle, domain)
+          console.log(`   ✅ ${enrichedContacts.length} contatos estimados gerados`)
+        }
+      }
+
+      console.log(`\n✅ Total de contatos encontrados: ${enrichedContacts.length}`)
 
       // 6. Gerar triggers CONTEXTUALIZADOS (baseado em eventos, notícias e dados da empresa)
       const allJobTitles = jobs.map(j => j.jobTitle).join(', ')
@@ -1186,7 +1177,7 @@ export class LeadOrchestratorService {
     const startTime = Date.now()
     const TIMEOUT_LIMIT = 280000 // 280 segundos (Vercel Fluid Compute: 300s total, deixa 20s de margem)
 
-    const { query, maxCompanies = 20 } = options
+    const { query, maxCompanies = 50 } = options
     console.log(' Iniciando scraping de vagas de múltiplas fontes...')
     console.log(`⚙  Limite: ${maxCompanies} empresas`)
     console.log(`⏱  Timeout configurado: ${TIMEOUT_LIMIT/1000}s`)
