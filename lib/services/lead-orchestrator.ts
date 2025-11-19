@@ -339,7 +339,7 @@ export class LeadOrchestratorService {
       let enrichedContacts: any[] = []
       let triggers: string[] = []
 
-      // 5.1. Buscar CNPJ se não tiver
+      // 5.1. Buscar CNPJ se não tiver (OBRIGATÓRIO)
       if (!company.cnpj) {
         console.log(`   🔍 Buscando CNPJ para ${company.name}...`)
         const cnpj = await cnpjFinder.findCNPJByName(company.name)
@@ -351,67 +351,65 @@ export class LeadOrchestratorService {
           company.cnpj = cnpj
           console.log(`   ✅ CNPJ encontrado: ${cnpj}`)
         } else {
-          console.log(`   ⚠️  CNPJ não encontrado`)
+          console.log(`   ❌ CNPJ não encontrado - DESCARTANDO empresa ${company.name}`)
+          console.log(`   ⏭️  Pulando para próxima empresa...\n`)
+          return null // DESCARTAR: sem CNPJ = sem dados confiáveis
         }
       } else {
         console.log(`   ✅ CNPJ já cadastrado: ${company.cnpj}`)
       }
 
-      // 5.2. Se tem CNPJ, buscar sócios decisores via API Nova Vida TI
-      if (company.cnpj) {
-        console.log(`   📞 Buscando sócios decisores via API Congonhas...`)
-        try {
-          const novaVidaData = await novaVidaTIEnrichment.enrichCompanyContacts(
-            company.cnpj,
-            company.name
-          )
+      // 5.2. Validar CNPJ e buscar sócios decisores via API Nova Vida TI (Congonhas)
+      console.log(`   📞 Validando CNPJ via API Congonhas...`)
+      try {
+        const novaVidaData = await novaVidaTIEnrichment.enrichCompanyContacts(
+          company.cnpj,
+          company.name
+        )
 
-          if (novaVidaData) {
-            console.log(`   ✅ ${novaVidaData.socios.length} sócio(s) encontrado(s)`)
-
-            // Pegar até 3 sócios mais relevantes
-            enrichedContacts = novaVidaData.socios.slice(0, 3).map((socio: any) => ({
-              name: socio.nome,
-              role: socio.qualificacao || 'Sócio',
-              email: socio.emails?.[0] || null,
-              phone: socio.telefones?.[0] || null,
-              linkedin: socio.linkedin || null,
-              source: 'novavidati'
-            }))
-
-            // Atualizar dados da empresa com faturamento e funcionários se disponível
-            const updates: any = {}
-            if (novaVidaData.qtdeFuncionarios && !company.employees) {
-              updates.employees = novaVidaData.qtdeFuncionarios
-              console.log(`   💼 Funcionários: ${novaVidaData.qtdeFuncionarios}`)
-            }
-            if (novaVidaData.capitalSocial && !company.revenue) {
-              updates.revenue = novaVidaData.capitalSocial * 5 // Estimativa: 5x capital social
-              console.log(`   💰 Faturamento estimado: R$ ${(updates.revenue / 1000000).toFixed(1)}M`)
-            }
-            if (Object.keys(updates).length > 0) {
-              await prisma.company.update({
-                where: { id: company.id },
-                data: updates
-              })
-            }
-          } else {
-            console.log(`   ⚠️  Nenhum dado encontrado`)
-          }
-        } catch (error) {
-          console.error(`   ❌ Erro ao buscar sócios:`, error instanceof Error ? error.message : String(error))
+        if (!novaVidaData) {
+          console.log(`   ❌ CNPJ inválido ou empresa não encontrada - DESCARTANDO`)
+          console.log(`   ⏭️  Pulando para próxima empresa...\n`)
+          return null // DESCARTAR: CNPJ não retornou dados válidos
         }
-      }
 
-      // 5.3. Fallback: Gerar contatos estimados inteligentes se não encontrou ninguém
-      if (enrichedContacts.length === 0 && company.website) {
-        console.log(`   📝 Gerando contatos estimados...`)
-        const domain = websiteFinder.extractDomain(company.website)
-        if (domain) {
-          const targetRoles = this.extractTargetRoles(mainJob.jobTitle)
-          enrichedContacts = this.generateSmartContacts(company, mainJob.jobTitle, domain)
-          console.log(`   ✅ ${enrichedContacts.length} contatos estimados gerados`)
+        console.log(`   ✅ Empresa validada: ${novaVidaData.razaoSocial}`)
+        console.log(`   ✅ ${novaVidaData.socios.length} sócio(s) encontrado(s)`)
+
+        // Pegar até 3 sócios mais relevantes
+        enrichedContacts = novaVidaData.socios.slice(0, 3).map((socio: any) => ({
+          name: socio.nome,
+          role: socio.qualificacao || 'Sócio',
+          email: socio.emails?.[0] || null,
+          phone: socio.telefones?.[0] || null,
+          linkedin: socio.linkedin || null,
+          source: 'novavidati'
+        }))
+
+        // Atualizar dados da empresa com faturamento e funcionários
+        const updates: any = {}
+        if (novaVidaData.qtdeFuncionarios && !company.employees) {
+          updates.employees = novaVidaData.qtdeFuncionarios
+          console.log(`   💼 Funcionários: ${novaVidaData.qtdeFuncionarios}`)
         }
+        if (novaVidaData.capitalSocial && !company.revenue) {
+          updates.revenue = novaVidaData.capitalSocial * 5 // Estimativa: 5x capital social
+          console.log(`   💰 Faturamento estimado: R$ ${(updates.revenue / 1000000).toFixed(1)}M`)
+        }
+        if (Object.keys(updates).length > 0) {
+          await prisma.company.update({
+            where: { id: company.id },
+            data: updates
+          })
+          // Atualizar objeto local
+          company.employees = updates.employees || company.employees
+          company.revenue = updates.revenue || company.revenue
+        }
+
+      } catch (error) {
+        console.error(`   ❌ Erro ao validar CNPJ:`, error instanceof Error ? error.message : String(error))
+        console.log(`   ⏭️  Pulando para próxima empresa...\n`)
+        return null // DESCARTAR: erro ao validar CNPJ
       }
 
       console.log(`\n✅ Total de contatos encontrados: ${enrichedContacts.length}`)
