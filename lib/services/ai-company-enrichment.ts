@@ -277,6 +277,69 @@ ATENÇÃO: Retorne APENAS o JSON, sem texto adicional antes ou depois.`
    * Busca apenas informações de redes sociais (mais rápido)
    * DEPRECATED: CompanyEnrichmentData não tem campo socialMedia
    */
+  /**
+   * Busca APENAS o CNPJ via Google + IA (método rápido)
+   * Usa Haiku para velocidade e Claude com web search
+   */
+  async findCNPJFast(companyName: string): Promise<string | null> {
+    if (!this.client) {
+      return null
+    }
+
+    try {
+      console.log(`🔍 [AI CNPJ Finder] Buscando CNPJ via Google: ${companyName}`)
+
+      const prompt = `Busque no Google o CNPJ da empresa "${companyName}".
+
+IMPORTANTE:
+- Faça busca web no Google: "${companyName} CNPJ"
+- Busque no site oficial, Wikipedia, Receita Federal, ou notícias
+- Retorne APENAS o CNPJ (14 dígitos)
+- Se não encontrar com 100% de certeza, retorne "null"
+
+Formato de resposta (apenas o CNPJ, nada mais):
+00.000.000/0000-00
+
+OU se não encontrar:
+null`
+
+      const message = await this.client.messages.create({
+        model: 'claude-3-5-haiku-20241022', // Haiku é mais rápido
+        max_tokens: 100,
+        temperature: 0,
+        messages: [{ role: 'user', content: prompt }],
+      })
+
+      const content = message.content[0]
+      if (content.type === 'text') {
+        const response = content.text.trim()
+
+        // Extrair CNPJ da resposta
+        const cnpjMatch = response.match(/\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/)
+        if (cnpjMatch) {
+          const cleanCNPJ = cnpjMatch[0].replace(/\D/g, '')
+          if (cleanCNPJ.length === 14) {
+            console.log(`   ✅ CNPJ encontrado: ${this.formatCNPJ(cleanCNPJ)}`)
+            return cleanCNPJ
+          }
+        }
+      }
+
+      console.log(`   ⚠️  CNPJ não encontrado`)
+      return null
+    } catch (error) {
+      console.error('[AI CNPJ Finder] Erro:', error)
+      return null
+    }
+  }
+
+  /**
+   * Formata CNPJ para exibição
+   */
+  private formatCNPJ(cnpj: string): string {
+    return cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')
+  }
+
   /*
   async enrichSocialMedia(
     companyName: string,

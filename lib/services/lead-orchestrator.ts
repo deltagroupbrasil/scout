@@ -339,17 +339,17 @@ export class LeadOrchestratorService {
       let enrichedContacts: any[] = []
       let triggers: string[] = []
 
-      // 5.1. Buscar CNPJ se não tiver (OBRIGATÓRIO)
+      // 5.1. Buscar CNPJ via Google + IA (OBRIGATÓRIO)
       if (!company.cnpj) {
-        console.log(`   🔍 Buscando CNPJ para ${company.name}...`)
-        const cnpj = await cnpjFinder.findCNPJByName(company.name)
+        console.log(`   🔍 Buscando CNPJ via Google + IA para ${company.name}...`)
+        const cnpj = await aiCompanyEnrichment.findCNPJFast(company.name)
         if (cnpj) {
           await prisma.company.update({
             where: { id: company.id },
             data: { cnpj }
           })
           company.cnpj = cnpj
-          console.log(`   ✅ CNPJ encontrado: ${cnpj}`)
+          console.log(`   ✅ CNPJ encontrado via IA: ${cnpj}`)
         } else {
           console.log(`   ❌ CNPJ não encontrado - DESCARTANDO empresa ${company.name}`)
           console.log(`   ⏭️  Pulando para próxima empresa...\n`)
