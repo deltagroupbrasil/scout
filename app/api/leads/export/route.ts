@@ -17,6 +17,11 @@ export async function GET(request: Request) {
     const status = searchParams.get('status')
     const dateRange = searchParams.get('dateRange')
     const search = searchParams.get('search')
+    const revenue = searchParams.get('revenue')
+    const employees = searchParams.get('employees')
+    const priority = searchParams.get('priority')
+    const source = searchParams.get('source')
+    const sector = searchParams.get('sector')
 
     // Build where clause
     const where: any = {}
@@ -25,12 +30,13 @@ export async function GET(request: Request) {
       where.status = status
     }
 
+    // Filtro de busca por nome da empresa
+    // SQLite não suporta mode: 'insensitive', usa LIKE case-insensitive por padrão
     if (search) {
       where.company = {
         name: {
-          contains: search,
-          mode: 'insensitive',
-        },
+          contains: search
+        }
       }
     }
 
@@ -55,6 +61,64 @@ export async function GET(request: Request) {
       where.createdAt = {
         gte: startDate,
       }
+    }
+
+    // Filtros avançados
+    if (!where.company) where.company = {}
+
+    // Filtro de receita
+    if (revenue) {
+      if (revenue === '0-10M') {
+        where.company.revenue = { lte: 10000000 }
+      } else if (revenue === '10M-50M') {
+        where.company.revenue = { gte: 10000000, lte: 50000000 }
+      } else if (revenue === '50M-100M') {
+        where.company.revenue = { gte: 50000000, lte: 100000000 }
+      } else if (revenue === '100M-500M') {
+        where.company.revenue = { gte: 100000000, lte: 500000000 }
+      } else if (revenue === '500M+') {
+        where.company.revenue = { gte: 500000000 }
+      }
+    }
+
+    // Filtro de funcionários
+    if (employees) {
+      if (employees === '0-50') {
+        where.company.employees = { lte: 50 }
+      } else if (employees === '50-200') {
+        where.company.employees = { gte: 50, lte: 200 }
+      } else if (employees === '200-500') {
+        where.company.employees = { gte: 200, lte: 500 }
+      } else if (employees === '500-1000') {
+        where.company.employees = { gte: 500, lte: 1000 }
+      } else if (employees === '1000+') {
+        where.company.employees = { gte: 1000 }
+      }
+    }
+
+    // Filtro de setor
+    if (sector && sector !== 'all') {
+      where.company.sector = { contains: sector }
+    }
+
+    // Filtro de prioridade
+    if (priority) {
+      if (priority === 'muito-alta') {
+        where.priorityScore = { gte: 80 }
+      } else if (priority === 'alta') {
+        where.priorityScore = { gte: 60, lt: 80 }
+      } else if (priority === 'media') {
+        where.priorityScore = { gte: 40, lt: 60 }
+      } else if (priority === 'baixa') {
+        where.priorityScore = { gte: 20, lt: 40 }
+      } else if (priority === 'muito-baixa') {
+        where.priorityScore = { lt: 20 }
+      }
+    }
+
+    // Filtro de fonte
+    if (source && source !== 'all') {
+      where.jobSource = source
     }
 
     // Fetch leads

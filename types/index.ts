@@ -62,9 +62,12 @@ export interface LeadWithCompany {
 export interface LeadFilters {
   status?: LeadStatus | 'ALL'
   search?: string
-  revenueMin?: number
-  revenueMax?: number
   dateRange?: '7d' | '30d' | 'all'
+  revenue?: '0-10M' | '10M-50M' | '50M-100M' | '100M-500M' | '500M+' | 'all'
+  employees?: '0-50' | '50-200' | '200-500' | '500-1000' | '1000+' | 'all'
+  priority?: 'muito-alta' | 'alta' | 'media' | 'baixa' | 'muito-baixa' | 'all'
+  source?: string
+  sector?: string
 }
 
 // ============================================

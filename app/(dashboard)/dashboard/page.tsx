@@ -35,6 +35,11 @@ export default function DashboardPage() {
       if (filters.status && filters.status !== 'ALL') params.set('status', filters.status)
       if (filters.search) params.set('search', filters.search)
       if (filters.dateRange) params.set('dateRange', filters.dateRange)
+      if (filters.revenue) params.set('revenue', filters.revenue)
+      if (filters.employees) params.set('employees', filters.employees)
+      if (filters.priority) params.set('priority', filters.priority)
+      if (filters.source) params.set('source', filters.source)
+      if (filters.sector) params.set('sector', filters.sector)
 
       const response = await fetch(`/api/leads?${params}`)
       if (!response.ok) throw new Error('Erro ao buscar leads')
@@ -63,6 +68,11 @@ export default function DashboardPage() {
     if (filters.status && filters.status !== 'ALL') params.set('status', filters.status)
     if (filters.search) params.set('search', filters.search)
     if (filters.dateRange) params.set('dateRange', filters.dateRange)
+    if (filters.revenue) params.set('revenue', filters.revenue)
+    if (filters.employees) params.set('employees', filters.employees)
+    if (filters.priority) params.set('priority', filters.priority)
+    if (filters.source) params.set('source', filters.source)
+    if (filters.sector) params.set('sector', filters.sector)
 
     const url = `/api/leads/export?${params}`
     window.open(url, '_blank')
