@@ -13,7 +13,7 @@ import {
 import { User } from "next-auth"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutList, LayoutDashboard } from "lucide-react"
+import { LayoutList, LayoutDashboard, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface DashboardNavProps {
@@ -37,6 +37,13 @@ export default function DashboardNav({ user }: DashboardNavProps) {
       icon: LayoutDashboard,
       active: pathname === "/dashboard/kanban",
       adminOnly: true, // Apenas admin pode ver o Kanban
+    },
+    {
+      href: "/dashboard/search-queries",
+      label: "Buscar Vagas",
+      icon: Search,
+      active: pathname === "/dashboard/search-queries",
+      adminOnly: true, // Apenas admin pode buscar vagas
     },
   ]
 

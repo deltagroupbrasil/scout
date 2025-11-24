@@ -93,7 +93,11 @@ export default function SearchQueriesPage() {
       const res = await fetch('/api/scrape', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(quickSearch),
+        body: JSON.stringify({
+          query: quickSearch.jobTitle,
+          location: quickSearch.location,
+          maxCompanies: quickSearch.maxCompanies,
+        }),
       })
 
       const data = await res.json()
