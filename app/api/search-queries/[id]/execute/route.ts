@@ -12,7 +12,7 @@ export const maxDuration = 300 // Vercel Fluid Compute: 5 minutos
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const startTime = Date.now()
 
@@ -23,9 +23,12 @@ export async function POST(
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
 
+    // Await params (Next.js 15+ requirement)
+    const { id } = await params
+
     // Buscar query
     const query = await prisma.searchQuery.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!query) {
@@ -74,7 +77,7 @@ export async function POST(
 
     // Atualizar query (última execução e contador)
     await prisma.searchQuery.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         lastUsedAt: new Date(),
         usageCount: { increment: 1 },

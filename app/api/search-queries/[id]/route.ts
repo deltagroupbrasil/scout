@@ -9,7 +9,7 @@ import { prisma } from '@/lib/prisma'
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -18,12 +18,15 @@ export async function PATCH(
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
 
+    // Await params (Next.js 15+ requirement)
+    const { id } = await params
+
     const body = await request.json()
     const { name, jobTitle, location, maxCompanies, isActive } = body
 
     // Verificar se query existe
     const existingQuery = await prisma.searchQuery.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!existingQuery) {
@@ -32,7 +35,7 @@ export async function PATCH(
 
     // Atualizar query
     const query = await prisma.searchQuery.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...(name && { name }),
         ...(jobTitle && { jobTitle }),
@@ -67,7 +70,7 @@ export async function PATCH(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -76,9 +79,12 @@ export async function DELETE(
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
 
+    // Await params (Next.js 15+ requirement)
+    const { id } = await params
+
     // Verificar se query existe
     const existingQuery = await prisma.searchQuery.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!existingQuery) {
@@ -87,7 +93,7 @@ export async function DELETE(
 
     // Deletar query
     await prisma.searchQuery.delete({
-      where: { id: params.id },
+      where: { id },
     })
 
     return NextResponse.json({ success: true })
