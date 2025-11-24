@@ -143,13 +143,7 @@ export class GupyScraperService {
     // Dados fictícios baseados em padrões reais do Gupy
     const mockJobs: LinkedInJobData[] = []
 
-    // Se a query incluir termos relevantes, retornar vagas fictícias
-    const relevantTerms = ['controller', 'controladoria', 'financ', 'bpo', 'contabil']
-    const isRelevant = relevantTerms.some(term =>
-      query.toLowerCase().includes(term)
-    )
-
-    if (isRelevant) {
+    // MUDANÇA: Remover filtro hardcoded - aceitar qualquer query
       mockJobs.push({
         jobTitle: "Analista de Controladoria",
         companyName: "Lojas Americanas S.A.",
@@ -227,7 +221,6 @@ Requisitos:
         candidateCount: 203,
         jobSource: 'Gupy',
       })
-    }
 
     return mockJobs
   }

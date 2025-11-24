@@ -107,11 +107,7 @@ export class IndeedScraperService {
    * Mock de vagas do Indeed para fallback (EXPANDIDO COM EMPRESAS REAIS)
    */
   private mockIndeedJobs(query: string): LinkedInJobData[] {
-    const relevantTerms = ['controller', 'controladoria', 'financ', 'bpo', 'contabil', 'cfo']
-    const isRelevant = relevantTerms.some(term => query.toLowerCase().includes(term))
-
-    if (!isRelevant) return []
-
+    // MUDANÇA: Remover filtro hardcoded - aceitar qualquer query
     return [
       // Varejo
       {

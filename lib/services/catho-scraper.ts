@@ -118,13 +118,9 @@ export class CathoScraperService {
 
     const mockJobs: LinkedInJobData[] = []
 
-    // Se a query incluir termos relevantes, retornar vagas fictícias
-    const relevantTerms = ['controller', 'controladoria', 'financ', 'bpo', 'contabil']
-    const isRelevant = relevantTerms.some(term =>
-      query.toLowerCase().includes(term)
-    )
-
-    if (isRelevant) {
+    // MUDANÇA: Remover filtro hardcoded - aceitar qualquer query
+    // Antes só retornava vagas se query contivesse 'controller', 'financ', etc
+    // Agora retorna vagas mock para qualquer busca
       mockJobs.push({
         jobTitle: "Controller",
         companyName: "Grupo Pão de Açúcar",
@@ -235,7 +231,6 @@ Perfil desejado:
         candidateCount: 187,
         jobSource: 'Catho',
       })
-    }
 
     return mockJobs
   }

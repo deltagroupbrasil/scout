@@ -93,11 +93,7 @@ export class GlassdoorScraperService {
    * Mock de vagas do Glassdoor
    */
   private mockGlassdoorJobs(query: string): LinkedInJobData[] {
-    const relevantTerms = ['controller', 'controladoria', 'financ', 'bpo', 'contabil', 'cfo']
-    const isRelevant = relevantTerms.some(term => query.toLowerCase().includes(term))
-
-    if (!isRelevant) return []
-
+    // MUDANÇA: Remover filtro hardcoded - aceitar qualquer query
     return [
       {
         jobTitle: "Analista de Controladoria Sênior",

@@ -1360,30 +1360,14 @@ export class LeadOrchestratorService {
   }
 
   /**
-   * Verifica se a vaga é relevante baseado na query de busca
-   * Filtra apenas estágios e trainee por padrão
+   * Verifica se a vaga é relevante
+   * Filtra apenas estágios, trainee e vagas claramente irrelevantes
+   * MUDANÇA: Não filtra mais por termos da query - aceita qualquer vaga encontrada
    */
   private isRelevantJob(jobTitle: string, searchQuery: string): boolean {
     const lowerTitle = jobTitle.toLowerCase()
-    const lowerQuery = searchQuery.toLowerCase()
 
-    // Extrair palavras-chave da query (ignorar palavras comuns)
-    const stopWords = ['e', 'ou', 'de', 'da', 'do', 'em', 'para', 'com', 'por']
-    const queryTerms = lowerQuery
-      .split(/[\s,]+/)
-      .filter(term => term.length > 2 && !stopWords.includes(term))
-
-    // Se não houver termos válidos na query, aceitar tudo (fallback)
-    if (queryTerms.length === 0) {
-      return true
-    }
-
-    // Verificar se o título da vaga contém pelo menos um termo da query
-    const hasRelevantTerm = queryTerms.some(term =>
-      lowerTitle.includes(term)
-    )
-
-    // Lista de termos genéricos/spam que devem ser sempre filtrados
+    // Lista de termos que indicam vagas irrelevantes (júnior demais ou spam)
     const spamTerms = [
       'estágio',
       'estagio',
@@ -1394,11 +1378,14 @@ export class LeadOrchestratorService {
 
     const isSpam = spamTerms.some(term => lowerTitle.includes(term))
 
+    // Rejeitar apenas se for spam/estágio
     if (isSpam) {
       return false
     }
 
-    return hasRelevantTerm
+    // MUDANÇA: Aceitar TODAS as outras vagas (não filtrar por termos da query)
+    // Isso permite que vagas de Marketing, Comercial, TI, etc sejam processadas
+    return true
   }
 
   /**

@@ -211,9 +211,8 @@ export class PublicScraperService {
       const data = await response.json()
       const jobs: LinkedInJobData[] = []
 
-      // Filtrar por query
+      // MUDANÇA: Remover filtro hardcoded - aceitar qualquer query
       const queryLower = query.toLowerCase()
-      const relevantTerms = ['controller', 'controladoria', 'financial', 'finance', 'cfo', 'accounting']
 
       for (const job of data.slice(1)) { // Primeiro item é metadata
         try {
@@ -221,13 +220,8 @@ export class PublicScraperService {
           const company = job.company || ''
           const description = job.description || ''
 
-          // Verificar se é relevante
-          const isRelevant = relevantTerms.some(term =>
-            title.toLowerCase().includes(term) ||
-            description.toLowerCase().includes(term)
-          )
-
-          if (isRelevant && company) {
+          // Aceitar todas as vagas (filtro removido)
+          if (company) {
             jobs.push({
               jobTitle: title,
               companyName: company,
@@ -254,11 +248,7 @@ export class PublicScraperService {
    * Retorna vagas de empresas brasileiras reais como último fallback
    */
   getFallbackJobs(query: string): LinkedInJobData[] {
-    const relevantTerms = ['controller', 'controladoria', 'financ', 'bpo', 'contabil', 'cfo']
-    const isRelevant = relevantTerms.some(term => query.toLowerCase().includes(term))
-
-    if (!isRelevant) return []
-
+    // MUDANÇA: Remover filtro hardcoded - aceitar qualquer query
     console.log('[PublicScraper]  Usando fallback EXPANDIDO de 35+ empresas brasileiras')
 
     // EXPANSÃO: 35+ empresas brasileiras reais e relevantes
