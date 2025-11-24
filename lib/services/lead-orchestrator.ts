@@ -1294,7 +1294,7 @@ export class LeadOrchestratorService {
     // Filtrar vagas irrelevantes (SEM logs individuais para não travar)
     console.log(` Filtrando ${allJobs.length} vagas...`)
     const relevantJobs = allJobs.filter(job => {
-      const isRelevant = this.isRelevantJob(job.jobTitle)
+      const isRelevant = this.isRelevantJob(job.jobTitle, query)
       // Remover console.logs individuais para não gerar output excessivo
       return isRelevant
     })
@@ -1360,72 +1360,45 @@ export class LeadOrchestratorService {
   }
 
   /**
-   * Verifica se a vaga é relevante para Controladoria/BPO Financeiro
+   * Verifica se a vaga é relevante baseado na query de busca
+   * Filtra apenas estágios e trainee por padrão
    */
-  private isRelevantJob(jobTitle: string): boolean {
+  private isRelevantJob(jobTitle: string, searchQuery: string): boolean {
     const lowerTitle = jobTitle.toLowerCase()
+    const lowerQuery = searchQuery.toLowerCase()
 
-    // Termos que DEVEM estar presentes
-    const relevantTerms = [
-      'controller',
-      'controladoria',
-      'financeiro',
-      'financeira',
-      'contábil',
-      'contabilidade',
-      'cfo',
-      'bpo',
-      'fiscal',
-      'tesouraria',
-      'contas a pagar',
-      'contas a receber',
-      'faturamento',
-      'budget',
-      'planejamento financeiro'
-    ]
+    // Extrair palavras-chave da query (ignorar palavras comuns)
+    const stopWords = ['e', 'ou', 'de', 'da', 'do', 'em', 'para', 'com', 'por']
+    const queryTerms = lowerQuery
+      .split(/[\s,]+/)
+      .filter(term => term.length > 2 && !stopWords.includes(term))
 
-    // Termos que NÃO devem estar presentes (vagas irrelevantes)
-    const irrelevantTerms = [
-      'marketing',
-      'vendas',
-      'comercial',
-      'ti',
-      'tecnologia',
-      'desenvolvedor',
-      'engenheiro',
-      'designer',
-      'produtor',
-      'eventos',
-      'rh',
-      'recursos humanos',
-      'logística',
-      'operações',
-      'atendimento',
-      'customer success',
-      'suporte'
-    ]
+    // Se não houver termos válidos na query, aceitar tudo (fallback)
+    if (queryTerms.length === 0) {
+      return true
+    }
 
-    // Verificar se tem termos irrelevantes
-    const hasIrrelevantTerms = irrelevantTerms.some(term =>
+    // Verificar se o título da vaga contém pelo menos um termo da query
+    const hasRelevantTerm = queryTerms.some(term =>
       lowerTitle.includes(term)
     )
 
-    if (hasIrrelevantTerms) {
-      // REMOVIDO: console.log causa travamento com muitas vagas
+    // Lista de termos genéricos/spam que devem ser sempre filtrados
+    const spamTerms = [
+      'estágio',
+      'estagio',
+      'jovem aprendiz',
+      'menor aprendiz',
+      'trainee'
+    ]
+
+    const isSpam = spamTerms.some(term => lowerTitle.includes(term))
+
+    if (isSpam) {
       return false
     }
 
-    // Verificar se tem pelo menos um termo relevante
-    const hasRelevantTerms = relevantTerms.some(term =>
-      lowerTitle.includes(term)
-    )
-
-    if (!hasRelevantTerms) {
-      // REMOVIDO: console.log causa travamento com muitas vagas
-      return false
-    }
-
-    return true
+    return hasRelevantTerm
   }
 
   /**
