@@ -25,9 +25,9 @@ export async function POST(request: NextRequest) {
     console.log(`[Scrape API] ✅ Usuário autenticado: ${session.user?.email}`)
 
     const body = await request.json()
-    const { query, maxCompanies = 20 } = body
+    const { query, location = 'Brasil', maxCompanies = 20 } = body
 
-    console.log(`[Scrape API] Query: "${query}", MaxCompanies: ${maxCompanies}`)
+    console.log(`[Scrape API] Query: "${query}", Location: "${location}", MaxCompanies: ${maxCompanies}`)
 
     if (!query) {
       return NextResponse.json(
@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
     // Background processing (sem await) é ABORTADO quando a response é retornada
     const result = await leadOrchestrator.scrapeAndProcessLeads({
       query,
+      location,
       maxCompanies
     })
 

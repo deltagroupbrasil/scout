@@ -1166,7 +1166,7 @@ export class LeadOrchestratorService {
   /**
    * Executa scraping completo e processa todos os leads de múltiplas fontes
    */
-  async scrapeAndProcessLeads(options: { query: string; maxCompanies?: number }): Promise<{
+  async scrapeAndProcessLeads(options: { query: string; location?: string; maxCompanies?: number }): Promise<{
     totalJobs: number
     savedLeads: number
     companiesProcessed: number
@@ -1175,62 +1175,22 @@ export class LeadOrchestratorService {
     const startTime = Date.now()
     const TIMEOUT_LIMIT = 280000 // 280 segundos (Vercel Fluid Compute: 300s total, deixa 20s de margem)
 
-    const { query, maxCompanies = 50 } = options
+    const { query, location = 'Brasil', maxCompanies = 50 } = options
     console.log(' Iniciando scraping de vagas de múltiplas fontes...')
+    console.log(`🔍 Query: ${query}`)
+    console.log(`📍 Localização: ${location}`)
     console.log(`⚙  Limite: ${maxCompanies} empresas`)
     console.log(`⏱  Timeout configurado: ${TIMEOUT_LIMIT/1000}s`)
-
-    // EXPANSÃO: Múltiplas queries para cobrir mais tipos de vagas
-    const queries = [
-      query, // Query original do usuário
-      'Controller Financeiro São Paulo',
-      'CFO Brasil',
-      'Gerente Financeiro',
-      'Diretor Financeiro',
-      'Analista Controladoria Sênior',
-    ]
-
-    // EXPANSÃO: Mais localizações brasileiras (top 10 + nacional)
-    const locations = [
-      'São Paulo, SP',
-      'Rio de Janeiro, RJ',
-      'Belo Horizonte, MG',
-      'Curitiba, PR',
-      'Porto Alegre, RS',
-      'Brasília, DF',
-      'Recife, PE',
-      'Fortaleza, CE',
-      'Salvador, BA',
-      'Campinas, SP',
-      'Brazil', // Busca nacional
-    ]
-
-    // Scraping de todas as fontes em paralelo com múltiplas localizações E queries
-    console.log(`📍 Buscando ${queries.length} queries em ${locations.length} localizações...`)
 
     const allLinkedInJobs: LinkedInJobData[] = []
 
     // SEMPRE usar API pública (Puppeteer não funciona em Vercel)
     console.log('🌐 Usando LinkedIn API Pública (compatível com serverless)')
     try {
-      // ESTRATÉGIA: Combinar queries + localizações para máxima cobertura
-      // Usar 2 queries principais × 3 localizações principais = 6 buscas
-      const topQueries = queries.slice(0, 2) // Query original + Controller
-      const topLocations = locations.slice(0, 3) // SP, RJ, MG
-
-      for (const searchQuery of topQueries) {
-        for (const location of topLocations) {
-          try {
-            console.log(` LinkedIn: "${searchQuery}" em ${location}`)
-            const jobs = await publicScraper.scrapeJobs(searchQuery, location)
-            allLinkedInJobs.push(...jobs)
-            console.log(`   → ${jobs.length} vagas`)
-            await this.sleep(800) // Delay entre buscas
-          } catch (err) {
-            console.error(`[LinkedIn ${location}] Erro:`, err)
-          }
-        }
-      }
+      console.log(` LinkedIn: "${query}" em ${location}`)
+      const jobs = await publicScraper.scrapeJobs(query, location)
+      allLinkedInJobs.push(...jobs)
+      console.log(`   → ${jobs.length} vagas`)
 
       console.log(` Total LinkedIn API Pública: ${allLinkedInJobs.length} vagas`)
     } catch (err) {
@@ -1253,25 +1213,15 @@ export class LeadOrchestratorService {
       }
     }
 
-    // SERP API: Descobrir mais fontes via Google
-    console.log('\n🔍 Tentando SERP API (Google search)...')
-    try {
-      const serpJobs = await serpApi.searchJobs(query, 'linkedin.com/jobs')
-      allLinkedInJobs.push(...serpJobs)
-      console.log(` SERP API encontrou ${serpJobs.length} vagas`)
-    } catch (err) {
-      console.error('[SERP API] Erro (continuando sem ele):', err)
-    }
-
-    console.log(`\n📊 Total LinkedIn (todos os métodos): ${allLinkedInJobs.length} vagas`)
+    console.log(`\n📊 Total LinkedIn: ${allLinkedInJobs.length} vagas`)
 
     // Outras fontes brasileiras (prioridade: Indeed, Glassdoor, Gupy, Catho)
     const [indeedJobs, glassdoorJobs, gupyJobs, cathoJobs] = await Promise.all([
-      indeedScraper.scrapeJobs(query, 'Brasil').catch(err => {
+      indeedScraper.scrapeJobs(query, location).catch(err => {
         console.error('[Indeed] Erro:', err)
         return []
       }),
-      glassdoorScraper.scrapeJobs(query, 'Brasil').catch(err => {
+      glassdoorScraper.scrapeJobs(query, location).catch(err => {
         console.error('[Glassdoor] Erro:', err)
         return []
       }),
@@ -1298,7 +1248,7 @@ export class LeadOrchestratorService {
       console.log(`\n⚠️  ${isProd ? 'PRODUÇÃO: Ativando' : 'Poucas vagas, ativando'} FALLBACK PÚBLICO...`)
 
       try {
-        publicJobs = await publicScraper.scrapeJobs(query).catch(err => {
+        publicJobs = await publicScraper.scrapeJobs(query, location).catch(err => {
           console.error('[PublicScraper] Erro:', err)
           return []
         })

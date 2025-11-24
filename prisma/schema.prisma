@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -30,6 +30,7 @@ model User {
   notes            Note[]
   contactFeedbacks ContactFeedback[]
   assignedLeads    Lead[]
+  searchQueries    SearchQuery[]
 
   @@map("User")
 }
@@ -253,6 +254,32 @@ model ContactFeedback {
   @@index([contactSource])
   @@index([isCorrect])
   @@map("ContactFeedback")
+}
+
+// ============================================
+// SEARCH QUERY MODEL (Queries de Busca Configuráveis)
+// ============================================
+model SearchQuery {
+  id          String   @id @default(uuid())
+  name        String   // Nome da query (ex: "Controllers SP", "CFOs Brasil")
+  jobTitle    String   // Termo de busca (ex: "Controller", "CFO", "Gerente Financeiro")
+  location    String   // Localização (ex: "São Paulo, SP", "Brasil")
+  maxCompanies Int     @default(20) // Limite de empresas por busca
+  isActive    Boolean  @default(true) // Ativa/Desativada
+
+  // Metadados
+  createdById String   // Usuário que criou
+  createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  lastUsedAt  DateTime? // Última vez que foi executada
+  usageCount  Int      @default(0) // Quantas vezes foi usada
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([createdById])
+  @@index([lastUsedAt])
+  @@map("SearchQuery")
 }
 
 // ============================================

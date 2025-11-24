@@ -1,28 +1,4 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron/scrape-leads",
-      "schedule": "0 8 * * *"
-    },
-    {
-      "path": "/api/cron/scrape-leads",
-      "schedule": "10 8 * * *"
-    },
-    {
-      "path": "/api/cron/scrape-leads",
-      "schedule": "20 8 * * *"
-    },
-    {
-      "path": "/api/cron/scrape-leads",
-      "schedule": "30 8 * * *"
-    },
-    {
-      "path": "/api/cron/scrape-leads",
-      "schedule": "40 8 * * *"
-    },
-    {
-      "path": "/api/cron/scrape-leads",
-      "schedule": "50 8 * * *"
-    }
-  ]
+  "_comment": "Cron jobs desabilitados - sistema agora é manual via dashboard",
+  "crons": []
 }
