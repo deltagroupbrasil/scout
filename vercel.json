@@ -1,4 +1,3 @@
 {
-  "_comment": "Cron jobs desabilitados - sistema agora é manual via dashboard",
   "crons": []
 }
