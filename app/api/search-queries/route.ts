@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getTenantContext, requireMinimumRole } from '@/lib/get-tenant-context'
 
 /**
  * GET /api/search-queries
@@ -15,13 +16,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
 
+    // Multi-Tenancy: obter tenant ativo
+    const { tenantId } = await getTenantContext()
+
     // Query params
     const { searchParams } = new URL(request.url)
     const includeInactive = searchParams.get('includeInactive') === 'true'
 
-    // Buscar queries
-    const queries = await prisma.searchQuery.findMany({
+    // Buscar queries do tenant
+    const queries = await prisma.tenantSearchQuery.findMany({
       where: {
+        tenantId, // Multi-Tenancy: CRITICAL
         ...(includeInactive ? {} : { isActive: true }),
       },
       include: {
@@ -61,6 +66,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
 
+    // Multi-Tenancy: validar acesso e permissão
+    const ctx = await getTenantContext()
+    await requireMinimumRole('MANAGER', ctx) // Apenas MANAGER+ pode criar queries
+
     // Validar dados
     const body = await request.json()
     const { name, jobTitle, location, maxCompanies } = body
@@ -72,13 +81,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Criar query
-    const query = await prisma.searchQuery.create({
+    // Criar query associada ao tenant
+    const query = await prisma.tenantSearchQuery.create({
       data: {
+        tenantId: ctx.tenantId, // Multi-Tenancy: associar ao tenant
         name,
         jobTitle,
         location,
         maxCompanies: maxCompanies || 20,
+        isLocked: false, // Queries criadas por usuários são editáveis
         createdById: session.user.id,
       },
       include: {

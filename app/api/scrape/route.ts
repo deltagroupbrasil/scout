@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { leadOrchestrator } from '@/lib/services/lead-orchestrator'
+import { getTenantContext } from '@/lib/get-tenant-context'
 
 // Vercel Fluid Compute: habilita timeout de 300s (5 minutos) no plano Hobby
 export const maxDuration = 300
@@ -24,6 +25,10 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Scrape API] ✅ Usuário autenticado: ${session.user?.email}`)
 
+    // Multi-Tenancy: obter tenant ativo
+    const { tenantId } = await getTenantContext()
+    console.log(`[Scrape API] Tenant ativo: ${tenantId}`)
+
     const body = await request.json()
     const { query, location = 'Brasil', maxCompanies = 20 } = body
 
@@ -41,11 +46,14 @@ export async function POST(request: NextRequest) {
 
     // CRÍTICO: Em serverless, processamento DEVE ser síncrono (com await)
     // Background processing (sem await) é ABORTADO quando a response é retornada
-    const result = await leadOrchestrator.scrapeAndProcessLeads({
-      query,
-      location,
-      maxCompanies
-    })
+    const result = await leadOrchestrator.scrapeAndProcessLeads(
+      {
+        query,
+        location,
+        maxCompanies
+      },
+      tenantId // Multi-Tenancy: passar tenant para scraping
+    )
 
     const duration = Math.floor((Date.now() - startTime) / 1000)
     console.log(`[Scrape API] ✅ Scraping concluído em ${duration}s`)

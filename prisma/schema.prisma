@@ -1,5 +1,5 @@
 // LeapScout - Sistema de Inteligência de Leads B2B
-// Prisma Schema - MVP Version 1.0
+// Prisma Schema - Multi-Tenant SaaS Version 2.0
 
 generator client {
   provider = "prisma-client-js"
@@ -11,6 +11,75 @@ datasource db {
 }
 
 // ============================================
+// TENANT MODEL (Multi-Tenancy)
+// ============================================
+model Tenant {
+  id              String   @id @default(uuid())
+  name            String   // Nome da empresa cliente (ex: "Magazine Luiza")
+  slug            String   @unique  // URL-friendly (ex: "magazine-luiza")
+
+  // Configuração
+  isActive        Boolean  @default(true)
+  plan            String   @default("basic")  // basic, pro, enterprise (placeholder para futuro)
+  maxUsers        Int      @default(5)
+  maxSearchQueries Int     @default(3)
+
+  // Billing
+  billingEmail    String?
+  contractStart   DateTime
+  contractEnd     DateTime?
+
+  // Metadados
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relações
+  tenantUsers      TenantUser[]
+  searchQueries    TenantSearchQuery[]
+  leads            Lead[]
+  notes            Note[]
+  scrapeLogs       ScrapeLog[]
+
+  @@index([slug])
+  @@index([isActive])
+  @@map("Tenant")
+}
+
+// ============================================
+// TENANT USER (Vínculo User-Tenant com Role)
+// ============================================
+model TenantUser {
+  id              String     @id @default(uuid())
+  tenantId        String
+  tenant          Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  role            TenantRole @default(VIEWER)
+  isActive        Boolean    @default(true)
+
+  createdAt       DateTime   @default(now())
+
+  @@unique([tenantId, userId])  // User pode estar em múltiplos tenants, mas apenas 1x por tenant
+  @@index([userId])
+  @@index([tenantId])
+  @@map("TenantUser")
+}
+
+// ============================================
+// SUPER ADMIN (Delta Group Staff)
+// ============================================
+model SuperAdmin {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime @default(now())
+
+  @@map("SuperAdmin")
+}
+
+// ============================================
 // USER MODEL
 // ============================================
 model User {
@@ -18,7 +87,7 @@ model User {
   email     String   @unique
   password  String
   name      String
-  isAdmin   Boolean  @default(false)  // Admin pode buscar leads e acessar Kanban
+  isAdmin   Boolean  @default(false)  // DEPRECATED: usar TenantUser.role
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -27,10 +96,15 @@ model User {
   twoFactorSecret  String?  // TOTP secret (encrypted)
   backupCodes      Json?    // Array de códigos de backup (encrypted)
 
+  // Multi-Tenancy
+  tenantUsers      TenantUser[]
+  superAdmin       SuperAdmin?
+  lastActiveTenantId String?  // Último tenant acessado
+
   notes            Note[]
   contactFeedbacks ContactFeedback[]
   assignedLeads    Lead[]
-  searchQueries    SearchQuery[]
+  searchQueries    TenantSearchQuery[]
 
   @@map("User")
 }
@@ -99,6 +173,11 @@ model Company {
 // ============================================
 model Lead {
   id              String   @id @default(uuid())
+
+  // Multi-Tenancy
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   companyId       String
   company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
@@ -134,18 +213,21 @@ model Lead {
   notes            Note[]
   contactFeedbacks ContactFeedback[]
 
-  // Índices simples (mantidos para queries específicas)
+  // Índices simples
+  @@index([tenantId])
   @@index([status])
   @@index([createdAt])
   @@index([companyId])
   @@index([assignedToId])
 
-  // Índices compostos otimizados (queries frequentes no dashboard)
-  @@index([status, createdAt])        // Dashboard: filtrar por status e ordenar por data
-  @@index([status, priorityScore])    // Dashboard: filtrar por status e ordenar por prioridade
-  @@index([companyId, status])        // Company page: leads de uma empresa por status
-  @@index([assignedToId, status])     // User page: leads atribuídos ao usuário por status
-  @@index([isNew, createdAt])         // Dashboard: destacar leads novos
+  // Índices compostos multi-tenant (CRITICAL para isolamento e performance)
+  @@index([tenantId, status])             // Dashboard: filtrar por tenant e status
+  @@index([tenantId, createdAt])          // Dashboard: leads do tenant ordenados por data
+  @@index([tenantId, status, createdAt])  // Dashboard: filtrar status e ordenar por data
+  @@index([tenantId, status, priorityScore])  // Dashboard: filtrar status e ordenar por prioridade
+  @@index([tenantId, companyId])          // Company page: leads de uma empresa no tenant
+  @@index([tenantId, assignedToId])       // User page: leads atribuídos no tenant
+  @@index([tenantId, isNew, createdAt])   // Dashboard: destacar leads novos no tenant
 
   @@map("Lead")
 }
@@ -155,6 +237,11 @@ model Lead {
 // ============================================
 model Note {
   id        String   @id @default(uuid())
+
+  // Multi-Tenancy
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   leadId    String
   lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
   userId    String
@@ -162,8 +249,10 @@ model Note {
   content   String
   createdAt DateTime @default(now())
 
+  @@index([tenantId])
   @@index([leadId])
   @@index([createdAt])
+  @@index([tenantId, leadId])  // Multi-tenant: notas de um lead no tenant
   @@map("Note")
 }
 
@@ -172,6 +261,11 @@ model Note {
 // ============================================
 model ScrapeLog {
   id            String   @id @default(uuid())
+
+  // Multi-Tenancy (opcional para logs globais de sistema)
+  tenantId      String?
+  tenant        Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
   status        String   // success, error, running
   query         String   // Query usada na busca
   jobsFound     Int      @default(0)
@@ -180,7 +274,9 @@ model ScrapeLog {
   duration      Int?     // Duração em segundos
   createdAt     DateTime @default(now())
 
+  @@index([tenantId])
   @@index([createdAt])
+  @@index([tenantId, createdAt])  // Multi-tenant: logs do tenant por data
   @@map("ScrapeLog")
 }
 
@@ -257,18 +353,26 @@ model ContactFeedback {
 }
 
 // ============================================
-// SEARCH QUERY MODEL (Queries de Busca Configuráveis)
+// TENANT SEARCH QUERY MODEL (Queries de Busca por Tenant)
 // ============================================
-model SearchQuery {
+model TenantSearchQuery {
   id          String   @id @default(uuid())
+
+  // Multi-Tenancy
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   name        String   // Nome da query (ex: "Controllers SP", "CFOs Brasil")
   jobTitle    String   // Termo de busca (ex: "Controller", "CFO", "Gerente Financeiro")
   location    String   // Localização (ex: "São Paulo, SP", "Brasil")
   maxCompanies Int     @default(20) // Limite de empresas por busca
   isActive    Boolean  @default(true) // Ativa/Desativada
 
+  // Controle Delta Group
+  isLocked    Boolean  @default(true)  // true = query fixa (configurada na venda), false = editável
+
   // Metadados
-  createdById String   // Usuário que criou
+  createdById String   // Usuário que criou (geralmente Super Admin da Delta Group)
   createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
   lastUsedAt  DateTime? // Última vez que foi executada
   usageCount  Int      @default(0) // Quantas vezes foi usada
@@ -276,10 +380,12 @@ model SearchQuery {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  @@index([tenantId])
   @@index([isActive])
   @@index([createdById])
   @@index([lastUsedAt])
-  @@map("SearchQuery")
+  @@index([tenantId, isActive])  // Multi-tenant: queries ativas do tenant
+  @@map("TenantSearchQuery")
 }
 
 // ============================================
@@ -292,4 +398,13 @@ enum LeadStatus {
   DISCARDED   // Descartado - Lead sem fit
 
   @@map("LeadStatus")
+}
+
+enum TenantRole {
+  ADMIN    // Acesso total ao tenant (gerenciar usuários, queries, leads)
+  MANAGER  // Pode gerenciar leads e atribuições (sem gerenciar usuários)
+  USER     // Pode ver e atualizar leads atribuídos a ele
+  VIEWER   // Apenas leitura (visualizar leads)
+
+  @@map("TenantRole")
 }

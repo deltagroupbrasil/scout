@@ -4,24 +4,79 @@ import { hash } from 'bcryptjs'
 const prisma = new PrismaClient()
 
 async function main() {
-  console.log('🌱 Iniciando seed do banco de dados...')
+  console.log('🌱 Iniciando seed do banco de dados (Multi-Tenancy)...')
 
-  // Criar usuário admin
+  // 1. Criar Tenant
+  console.log('\n1️⃣  Criando tenant...')
+  const tenant = await prisma.tenant.upsert({
+    where: { slug: 'leap-solutions' },
+    update: {},
+    create: {
+      name: 'Leap Solutions',
+      slug: 'leap-solutions',
+      isActive: true,
+      plan: 'enterprise',
+      maxUsers: 50,
+      maxSearchQueries: 10,
+      billingEmail: 'billing@leapsolutions.com.br',
+      contractStart: new Date(),
+    },
+  })
+  console.log(`✅ Tenant criado: ${tenant.name}`)
+
+  // 2. Criar usuário admin
+  console.log('\n2️⃣  Criando usuário admin...')
   const hashedPassword = await hash('admin123', 12)
 
   const user = await prisma.user.upsert({
     where: { email: 'admin@leapsolutions.com.br' },
-    update: {},
+    update: { lastActiveTenantId: tenant.id },
     create: {
       email: 'admin@leapsolutions.com.br',
       name: 'Administrador',
       password: hashedPassword,
+      lastActiveTenantId: tenant.id,
     },
   })
+  console.log(`✅ Usuário criado: ${user.email}`)
 
-  console.log('✅ Usuário admin criado:', user.email)
+  // 3. Vincular usuário ao tenant
+  console.log('\n3️⃣  Vinculando usuário ao tenant...')
+  await prisma.tenantUser.upsert({
+    where: {
+      tenantId_userId: {
+        tenantId: tenant.id,
+        userId: user.id,
+      },
+    },
+    update: { role: 'ADMIN' },
+    create: {
+      tenantId: tenant.id,
+      userId: user.id,
+      role: 'ADMIN',
+      isActive: true,
+    },
+  })
+  console.log('✅ Usuário vinculado como ADMIN')
 
-  // Criar empresa de exemplo
+  // 4. Criar queries de busca do tenant
+  console.log('\n4️⃣  Criando queries de busca...')
+  await prisma.tenantSearchQuery.create({
+    data: {
+      tenantId: tenant.id,
+      name: 'Controllers São Paulo',
+      jobTitle: 'Controller',
+      location: 'São Paulo, SP',
+      maxCompanies: 20,
+      isActive: true,
+      isLocked: false,
+      createdById: user.id,
+    },
+  })
+  console.log('✅ Query "Controllers São Paulo" criada')
+
+  // 5. Criar empresa de exemplo
+  console.log('\n5️⃣  Criando empresas de exemplo...')
   const company = await prisma.company.create({
     data: {
       name: 'Ambev S.A.',
@@ -34,10 +89,10 @@ async function main() {
       linkedinUrl: 'https://www.linkedin.com/company/ambev',
     },
   })
+  console.log(`✅ Empresa criada: ${company.name}`)
 
-  console.log('✅ Empresa de exemplo criada:', company.name)
-
-  // Criar lead de exemplo
+  // 6. Criar lead de exemplo
+  console.log('\n6️⃣  Criando leads de exemplo...')
   const suggestedContacts = [
     {
       name: 'Carlos Mendes',
@@ -61,6 +116,7 @@ async function main() {
 
   const lead = await prisma.lead.create({
     data: {
+      tenantId: tenant.id, // Multi-Tenancy
       companyId: company.id,
       jobTitle: 'Controller Sênior',
       jobDescription: 'Responsável por coordenar equipe de controladoria, análises gerenciais, fechamento contábil e reporting financeiro. Requisitos: experiência em S/4 HANA, inglês fluente.',
@@ -70,25 +126,27 @@ async function main() {
       candidateCount: 45,
       status: 'NEW',
       isNew: true,
+      priorityScore: 75,
       suggestedContacts: JSON.stringify(suggestedContacts),
       triggers: JSON.stringify(triggers),
     },
   })
+  console.log(`✅ Lead criado: ${lead.jobTitle}`)
 
-  console.log('✅ Lead de exemplo criado:', lead.jobTitle)
-
-  // Criar nota de exemplo
+  // 7. Criar nota de exemplo
+  console.log('\n7️⃣  Criando nota de exemplo...')
   await prisma.note.create({
     data: {
+      tenantId: tenant.id, // Multi-Tenancy
       leadId: lead.id,
       userId: user.id,
       content: 'Ligação com Carlos agendada para 13/11 às 14h',
     },
   })
+  console.log('✅ Nota criada')
 
-  console.log('✅ Nota de exemplo criada')
-
-  // Criar mais empresas e leads
+  // 8. Criar mais empresas e leads
+  console.log('\n8️⃣  Criando empresas e leads adicionais...')
   const companies = [
     {
       name: 'Magazine Luiza',
@@ -155,6 +213,7 @@ async function main() {
 
     await prisma.lead.create({
       data: {
+        tenantId: tenant.id, // Multi-Tenancy
         companyId: newCompany.id,
         jobTitle,
         jobDescription: `Estamos buscando profissional experiente para ${jobTitle}. Responsável por liderar equipe financeira, reporting gerencial, e garantir compliance com normas contábeis. Requisitos: experiência em ERP, inglês intermediário.`,
@@ -164,6 +223,7 @@ async function main() {
         candidateCount: Math.floor(Math.random() * 100) + 20,
         status: Math.random() > 0.5 ? 'NEW' : 'CONTACTED',
         isNew: Math.random() > 0.5,
+        priorityScore: Math.floor(Math.random() * 100),
         suggestedContacts: JSON.stringify(leadContacts),
         triggers: JSON.stringify(leadTriggers),
       },
@@ -177,6 +237,7 @@ async function main() {
   console.log('\n📋 Credenciais de acesso:')
   console.log('   Email: admin@leapsolutions.com.br')
   console.log('   Senha: admin123')
+  console.log(`\n🏢 Tenant: ${tenant.name} (${tenant.slug})`)
 }
 
 main()

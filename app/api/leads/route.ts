@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { LeadStatus } from '@prisma/client'
+import { getTenantContext } from '@/lib/get-tenant-context'
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,6 +12,9 @@ export async function GET(request: NextRequest) {
     if (!session) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
+
+    // Multi-Tenancy: obter tenant ativo
+    const { tenantId } = await getTenantContext()
 
     const searchParams = request.nextUrl.searchParams
     const status = searchParams.get('status') as LeadStatus | 'ALL' | null
@@ -27,7 +31,10 @@ export async function GET(request: NextRequest) {
     const sector = searchParams.get('sector')
 
     // Construir filtros
-    const where: any = {}
+    const where: any = {
+      // Multi-Tenancy: CRITICAL - sempre filtrar por tenant
+      tenantId,
+    }
 
     // Filtro de status
     if (status && status !== 'ALL') {

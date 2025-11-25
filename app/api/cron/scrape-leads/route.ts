@@ -35,75 +35,128 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  let scrapeLogId: string | undefined
-
   try {
-    // Criar log de execução
-    const scrapeLog = await prisma.scrapeLog.create({
-      data: {
-        status: 'running',
-        query: 'Controller OR CFO OR Controladoria São Paulo',
-        jobsFound: 0,
-        leadsCreated: 0,
+    console.log('🤖 [Cron] Iniciando cron job de scraping multi-tenant...')
+
+    // Multi-Tenancy: Buscar todos os tenants ativos
+    const activeTenants = await prisma.tenant.findMany({
+      where: { isActive: true },
+      include: {
+        searchQueries: {
+          where: { isActive: true },
+        },
       },
     })
 
-    scrapeLogId = scrapeLog.id
+    console.log(`📊 [Cron] Encontrados ${activeTenants.length} tenants ativos`)
 
-    console.log(' Iniciando cron job de scraping...')
+    let totalLeadsCreated = 0
+    let totalJobsFound = 0
+    const allErrors: string[] = []
 
-    // Query para buscar vagas - termos específicos de Controladoria e BPO Financeiro
-    const query = 'Controller OR CFO OR "Gerente Financeiro" OR "Diretor Financeiro" OR Controladoria São Paulo'
+    // Processar cada tenant
+    for (const tenant of activeTenants) {
+      console.log(`\n🏢 [Cron] Processando tenant: ${tenant.name}`)
 
-    // Executar scraping com limite de 20 empresas (6x ao dia de 10 em 10 minutos, 5h-6h)
-    // Total: 6 execuções × 20 empresas = até 120 empresas/dia
-    // Vercel Fluid Compute habilitado: maxDuration = 300s
-    const result = await leadOrchestrator.scrapeAndProcessLeads({
-      query,
-      maxCompanies: 20
-    })
+      if (tenant.searchQueries.length === 0) {
+        console.log(`   ⚠️ Tenant sem queries ativas, pulando...`)
+        continue
+      }
 
-    const leadsCreated = result.savedLeads
+      // Criar log de execução para este tenant
+      const scrapeLog = await prisma.scrapeLog.create({
+        data: {
+          tenantId: tenant.id,
+          status: 'running',
+          query: tenant.searchQueries.map(q => q.jobTitle).join(', '),
+          jobsFound: 0,
+          leadsCreated: 0,
+        },
+      })
+
+      try {
+        // Processar cada query do tenant
+        for (const searchQuery of tenant.searchQueries) {
+          console.log(`   🔍 Query: "${searchQuery.jobTitle}" em ${searchQuery.location}`)
+
+          const result = await leadOrchestrator.scrapeAndProcessLeads(
+            {
+              query: searchQuery.jobTitle,
+              location: searchQuery.location,
+              maxCompanies: searchQuery.maxCompanies,
+            },
+            tenant.id // Multi-Tenancy: passar tenant ID
+          )
+
+          totalLeadsCreated += result.savedLeads
+          totalJobsFound += result.totalJobs
+          allErrors.push(...result.errors)
+
+          // Atualizar contador de uso da query
+          await prisma.tenantSearchQuery.update({
+            where: { id: searchQuery.id },
+            data: {
+              usageCount: { increment: 1 },
+              lastUsedAt: new Date(),
+            },
+          })
+
+          console.log(`      → ${result.savedLeads} leads salvos, ${result.totalJobs} vagas encontradas`)
+        }
+
+        // Atualizar log com sucesso
+        const duration = Math.floor((Date.now() - startTime) / 1000)
+        await prisma.scrapeLog.update({
+          where: { id: scrapeLog.id },
+          data: {
+            status: 'success',
+            jobsFound: totalJobsFound,
+            leadsCreated: totalLeadsCreated,
+            duration,
+            ...(allErrors.length > 0 && { errors: JSON.stringify(allErrors) }),
+          },
+        })
+
+        console.log(`   ✅ Tenant ${tenant.name} processado com sucesso`)
+      } catch (tenantError) {
+        console.error(`   ❌ Erro ao processar tenant ${tenant.name}:`, tenantError)
+
+        // Atualizar log com erro
+        await prisma.scrapeLog.update({
+          where: { id: scrapeLog.id },
+          data: {
+            status: 'error',
+            duration: Math.floor((Date.now() - startTime) / 1000),
+            errors: JSON.stringify({
+              message: tenantError instanceof Error ? tenantError.message : String(tenantError),
+            }),
+          },
+        })
+
+        allErrors.push(`Tenant ${tenant.name}: ${tenantError instanceof Error ? tenantError.message : String(tenantError)}`)
+      }
+    }
 
     const duration = Math.floor((Date.now() - startTime) / 1000)
-
-    // Atualizar log com sucesso
-    await prisma.scrapeLog.update({
-      where: { id: scrapeLogId },
-      data: {
-        status: 'success',
-        jobsFound: result.totalJobs,
-        leadsCreated: result.savedLeads,
-        duration,
-        ...(result.errors.length > 0 && { errors: JSON.stringify(result.errors) }),
-      },
-    })
-
-    console.log(` Cron job concluído: ${leadsCreated} leads criados em ${duration}s`)
+    console.log(`\n🎉 [Cron] Job concluído: ${totalLeadsCreated} leads criados de ${totalJobsFound} vagas em ${duration}s`)
 
     return NextResponse.json({
       success: true,
-      leadsCreated,
+      tenantsProcessed: activeTenants.length,
+      leadsCreated: totalLeadsCreated,
+      jobsFound: totalJobsFound,
       duration,
-      message: `Scraping concluído com sucesso. ${leadsCreated} leads criados.`,
+      errors: allErrors,
+      message: `Scraping concluído para ${activeTenants.length} tenants. ${totalLeadsCreated} leads criados.`,
     })
   } catch (error) {
-    console.error(' Erro no cron job:', error)
+    console.error('❌ [Cron] Erro crítico no cron job:', error)
 
     const duration = Math.floor((Date.now() - startTime) / 1000)
     const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
 
-    // Atualizar log com erro
-    if (scrapeLogId) {
-      await prisma.scrapeLog.update({
-        where: { id: scrapeLogId },
-        data: {
-          status: 'error',
-          duration,
-          errors: JSON.stringify({ message: errorMessage }),
-        },
-      })
-    }
+    // Erro global do cron (não específico de um tenant)
+    // Logs individuais de cada tenant já foram tratados no loop acima
 
     return NextResponse.json(
       {

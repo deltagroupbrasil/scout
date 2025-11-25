@@ -25,6 +25,22 @@ export const authOptions: NextAuthOptions = {
           const user = await prisma.user.findUnique({
             where: {
               email: credentials.email.toLowerCase()
+            },
+            include: {
+              tenantUsers: {
+                where: { isActive: true },
+                include: {
+                  tenant: {
+                    select: {
+                      id: true,
+                      name: true,
+                      slug: true,
+                      isActive: true,
+                    }
+                  }
+                }
+              },
+              superAdmin: true,
             }
           })
 
@@ -45,11 +61,36 @@ export const authOptions: NextAuthOptions = {
 
           console.log('[Auth] ✅ Autenticação bem-sucedida!')
 
+          // Preparar lista de tenants ativos
+          const tenants = user.tenantUsers
+            .filter(tu => tu.tenant.isActive)
+            .map(tu => ({
+              tenantId: tu.tenant.id,
+              tenantName: tu.tenant.name,
+              tenantSlug: tu.tenant.slug,
+              role: tu.role,
+              isActive: tu.isActive,
+            }))
+
+          console.log(`[Auth] Usuário tem acesso a ${tenants.length} tenant(s)`)
+
+          // Se usuário não tem tenants, bloquear acesso
+          if (tenants.length === 0 && !user.superAdmin) {
+            console.error('[Auth] Usuário sem tenants ativos')
+            throw new Error("Usuário não possui acesso a nenhuma organização")
+          }
+
+          // Usar lastActiveTenantId ou primeiro tenant disponível
+          const activeTenantId = user.lastActiveTenantId || tenants[0]?.tenantId || null
+
           return {
             id: user.id,
             email: user.email,
             name: user.name,
             isAdmin: user.isAdmin,
+            activeTenantId,
+            tenants,
+            isSuperAdmin: !!user.superAdmin,
           }
         } catch (error: any) {
           console.error('[Auth] Erro durante autenticação:', error.message)
@@ -66,17 +107,30 @@ export const authOptions: NextAuthOptions = {
     signIn: "/login",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
+      // Login inicial: carregar dados do usuário
       if (user) {
         token.id = user.id
         token.isAdmin = user.isAdmin
+        token.activeTenantId = user.activeTenantId || null
+        token.tenants = user.tenants || []
+        token.isSuperAdmin = user.isSuperAdmin || false
       }
+
+      // Atualização de sessão (ex: switch de tenant)
+      if (trigger === "update" && session?.activeTenantId) {
+        token.activeTenantId = session.activeTenantId
+      }
+
       return token
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string
         session.user.isAdmin = token.isAdmin as boolean
+        session.user.activeTenantId = token.activeTenantId as string | null
+        session.user.tenants = token.tenants as any
+        session.user.isSuperAdmin = token.isSuperAdmin as boolean
       }
       return session
     }

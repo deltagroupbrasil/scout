@@ -30,8 +30,11 @@ export class LeadOrchestratorService {
   /**
    * Pipeline completo OTIMIZADO (Baixo Custo):
    * LinkedIn → Website Discovery → LinkedIn Company Scraping → CNPJ → PESSOAS REAIS (Google + Web Scraping) → Contact Enrichment
+   *
+   * @param jobData Dados da vaga obtidos via scraping
+   * @param tenantId ID do tenant (multi-tenancy)
    */
-  async processJobListing(jobData: LinkedInJobData): Promise<string | null> {
+  async processJobListing(jobData: LinkedInJobData, tenantId: string): Promise<string | null> {
     try {
       console.log(`\n${'='.repeat(70)}`)
       console.log(` Processando vaga: ${jobData.jobTitle}`)
@@ -49,11 +52,12 @@ export class LeadOrchestratorService {
         return null
       }
 
-      // 2. Verificar se lead já existe (mesma vaga)
+      // 2. Verificar se lead já existe (mesma vaga no tenant)
       const existingLead = await prisma.lead.findFirst({
         where: {
           jobUrl: jobData.jobUrl,
           companyId: company.id,
+          tenantId, // Multi-Tenancy: verificar no tenant
         },
       })
 
@@ -161,6 +165,7 @@ export class LeadOrchestratorService {
       const lead = await prisma.lead.create({
         data: {
           companyId: company.id,
+          tenantId, // Multi-Tenancy: associar ao tenant
           jobTitle: jobData.jobTitle,
           jobDescription: jobData.description,
           jobUrl: jobData.jobUrl,
@@ -200,8 +205,11 @@ export class LeadOrchestratorService {
   /**
    * Processa uma empresa com múltiplas vagas (agrupamento)
    * Cria UM ÚNICO lead com a vaga principal + vagas relacionadas
+   *
+   * @param jobs Lista de vagas da mesma empresa
+   * @param tenantId ID do tenant (multi-tenancy)
    */
-  async processCompanyWithMultipleJobs(jobs: LinkedInJobData[]): Promise<string | null> {
+  async processCompanyWithMultipleJobs(jobs: LinkedInJobData[], tenantId: string): Promise<string | null> {
     try {
       if (jobs.length === 0) return null
 
@@ -226,10 +234,11 @@ export class LeadOrchestratorService {
         return null
       }
 
-      // 2. Verificar se já existe lead para esta empresa
+      // 2. Verificar se já existe lead para esta empresa no tenant
       const existingLead = await prisma.lead.findFirst({
         where: {
           companyId: company.id,
+          tenantId, // Multi-Tenancy: verificar no tenant
         },
       })
 
@@ -435,6 +444,7 @@ export class LeadOrchestratorService {
       const lead = await prisma.lead.create({
         data: {
           companyId: company.id,
+          tenantId, // Multi-Tenancy: associar ao tenant
           jobTitle: mainJob.jobTitle,
           jobDescription: mainJob.description || mainJob.jobDescription || '',
           jobUrl: mainJob.jobUrl,
@@ -1165,8 +1175,14 @@ export class LeadOrchestratorService {
 
   /**
    * Executa scraping completo e processa todos os leads de múltiplas fontes
+   *
+   * @param options Opções de scraping (query, location, maxCompanies)
+   * @param tenantId ID do tenant (multi-tenancy)
    */
-  async scrapeAndProcessLeads(options: { query: string; location?: string; maxCompanies?: number }): Promise<{
+  async scrapeAndProcessLeads(
+    options: { query: string; location?: string; maxCompanies?: number },
+    tenantId: string
+  ): Promise<{
     totalJobs: number
     savedLeads: number
     companiesProcessed: number
@@ -1203,8 +1219,8 @@ export class LeadOrchestratorService {
       console.log('\n🎭 Tentando Puppeteer LinkedIn (browser real)...')
       try {
         const puppeteerJobs = await linkedInPuppeteerScraper.scrapeJobs(
-          queries[0], // Usar primeira query
-          locations[0] // São Paulo
+          query, // Query fornecida como parâmetro
+          location // Location fornecida como parâmetro
         )
         allLinkedInJobs.push(...puppeteerJobs)
         console.log(` Puppeteer adicionou ${puppeteerJobs.length} vagas`)
@@ -1335,7 +1351,7 @@ export class LeadOrchestratorService {
       console.log(`\n Processando: ${jobs[0].companyName} (${jobs.length} vagas) [${(elapsedTime/1000).toFixed(1)}s decorridos]`)
 
       try {
-        const leadId = await this.processCompanyWithMultipleJobs(jobs)
+        const leadId = await this.processCompanyWithMultipleJobs(jobs, tenantId)
         if (leadId) {
           successCount++
         }

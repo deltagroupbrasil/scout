@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { leadOrchestrator } from '@/lib/services/lead-orchestrator'
+import { getTenantContext } from '@/lib/get-tenant-context'
 
 export const maxDuration = 300 // Vercel Fluid Compute: 5 minutos
 
@@ -23,12 +24,18 @@ export async function POST(
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
 
+    // Multi-Tenancy: obter tenant ativo
+    const { tenantId } = await getTenantContext()
+
     // Await params (Next.js 15+ requirement)
     const { id } = await params
 
-    // Buscar query
-    const query = await prisma.searchQuery.findUnique({
-      where: { id },
+    // Buscar query no tenant do usuário
+    const query = await prisma.tenantSearchQuery.findFirst({
+      where: {
+        id,
+        tenantId, // Multi-Tenancy: CRITICAL - validar acesso ao tenant
+      },
     })
 
     if (!query) {
@@ -47,6 +54,7 @@ export async function POST(
     // Criar log de execução
     const scrapeLog = await prisma.scrapeLog.create({
       data: {
+        tenantId, // Multi-Tenancy: associar log ao tenant
         status: 'running',
         query: `${query.jobTitle} - ${query.location}`,
         jobsFound: 0,
@@ -55,11 +63,14 @@ export async function POST(
     })
 
     // Executar scraping
-    const result = await leadOrchestrator.scrapeAndProcessLeads({
-      query: query.jobTitle,
-      location: query.location,
-      maxCompanies: query.maxCompanies,
-    })
+    const result = await leadOrchestrator.scrapeAndProcessLeads(
+      {
+        query: query.jobTitle,
+        location: query.location,
+        maxCompanies: query.maxCompanies,
+      },
+      tenantId // Multi-Tenancy: passar tenant para scraping
+    )
 
     const duration = Math.floor((Date.now() - startTime) / 1000)
 
@@ -76,7 +87,7 @@ export async function POST(
     })
 
     // Atualizar query (última execução e contador)
-    await prisma.searchQuery.update({
+    await prisma.tenantSearchQuery.update({
       where: { id },
       data: {
         lastUsedAt: new Date(),

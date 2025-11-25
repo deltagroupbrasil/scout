@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getTenantContext } from '@/lib/get-tenant-context'
 
 export async function GET(
   request: NextRequest,
@@ -14,10 +15,16 @@ export async function GET(
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
 
+    // Multi-Tenancy: obter tenant ativo
+    const { tenantId } = await getTenantContext()
+
     const { id } = await params
 
-    const lead = await prisma.lead.findUnique({
-      where: { id },
+    const lead = await prisma.lead.findFirst({
+      where: {
+        id,
+        tenantId, // Multi-Tenancy: CRITICAL - validar acesso ao tenant
+      },
       include: {
         company: true,
         notes: {
@@ -62,9 +69,21 @@ export async function PATCH(
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
 
+    // Multi-Tenancy: obter tenant ativo
+    const { tenantId } = await getTenantContext()
+
     const { id } = await params
     const body = await request.json()
     const { status, isNew } = body
+
+    // Multi-Tenancy: CRITICAL - verificar se lead pertence ao tenant
+    const existingLead = await prisma.lead.findFirst({
+      where: { id, tenantId },
+    })
+
+    if (!existingLead) {
+      return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 })
+    }
 
     // Quando o status muda de NEW para qualquer outro, marca isNew como false
     // Mas se voltar para NEW, NÃO muda o isNew (deixa como estava)

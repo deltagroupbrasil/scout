@@ -15,6 +15,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { LayoutList, LayoutDashboard, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
+import TenantSwitcher from "./tenant-switcher"
 
 interface DashboardNavProps {
   user: User
@@ -56,11 +57,15 @@ export default function DashboardNav({ user }: DashboardNavProps) {
     <nav className="border-b bg-white dark:bg-gray-800">
       <div className="container mx-auto px-4 max-w-7xl">
         <div className="flex h-16 items-center justify-between">
-          <div className="flex items-center gap-8">
+          <div className="flex items-center gap-4">
+            {/* Logo */}
             <div className="flex items-center gap-2">
               <span className="text-2xl"></span>
               <h1 className="text-xl font-bold">LeapScout</h1>
             </div>
+
+            {/* Tenant Switcher - Multi-Tenancy */}
+            <TenantSwitcher className="hidden lg:flex" />
 
             {/* Navigation Links */}
             <div className="hidden md:flex items-center gap-2">
