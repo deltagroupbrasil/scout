@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getTenantContext, requireMinimumRole } from '@/lib/get-tenant-context'
+import { checkSearchQueryQuota, hasFeature } from '@/lib/tenant-features'
 
 /**
  * GET /api/search-queries
@@ -69,6 +70,24 @@ export async function POST(request: NextRequest) {
     // Multi-Tenancy: validar acesso e permissão
     const ctx = await getTenantContext()
     await requireMinimumRole('MANAGER', ctx) // Apenas MANAGER+ pode criar queries
+
+    // Verificar se tenant tem a feature de busca habilitada
+    const hasSearchFeature = await hasFeature(ctx.tenantId, 'search')
+    if (!hasSearchFeature && !ctx.isSuperAdmin) {
+      return NextResponse.json(
+        { error: 'Recurso não disponível. A busca de vagas não está habilitada para sua organização.' },
+        { status: 403 }
+      )
+    }
+
+    // Verificar quota de queries
+    const quotaCheck = await checkSearchQueryQuota(ctx.tenantId)
+    if (!quotaCheck.ok) {
+      return NextResponse.json(
+        { error: quotaCheck.error },
+        { status: 403 }
+      )
+    }
 
     // Validar dados
     const body = await request.json()

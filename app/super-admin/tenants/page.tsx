@@ -5,6 +5,9 @@ import { Building2, Users, CalendarDays, CheckCircle2, XCircle } from "lucide-re
 import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { CreateTenantForm } from "@/components/super-admin/create-tenant-form"
+import { EditTenantForm } from "@/components/super-admin/edit-tenant-form"
+import { ManageFeaturesForm } from "@/components/super-admin/manage-features-form"
+import { TenantFeature } from "@/lib/get-tenant-context"
 
 export default async function SuperAdminTenantsPage() {
   // Buscar todos os tenants com estatísticas
@@ -86,88 +89,122 @@ export default async function SuperAdminTenantsPage() {
       <div className="space-y-4">
         <h3 className="text-lg font-semibold">Todos os Tenants</h3>
 
-        {tenants.map((tenant) => (
-          <Card key={tenant.id}>
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <CardTitle>{tenant.name}</CardTitle>
-                    {tenant.isActive ? (
-                      <Badge variant="default" className="gap-1">
-                        <CheckCircle2 className="h-3 w-3" />
-                        Ativo
-                      </Badge>
-                    ) : (
-                      <Badge variant="destructive" className="gap-1">
-                        <XCircle className="h-3 w-3" />
-                        Inativo
-                      </Badge>
-                    )}
-                    <Badge variant="outline">{tenant.plan}</Badge>
+        {tenants.map((tenant) => {
+          // Parse features
+          let features: TenantFeature[] = ['dashboard']
+          try {
+            const parsed = tenant.enabledFeatures as TenantFeature[]
+            if (Array.isArray(parsed)) features = parsed
+          } catch { /* fallback */ }
+
+          return (
+            <Card key={tenant.id}>
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <CardTitle>{tenant.name}</CardTitle>
+                      {tenant.isActive ? (
+                        <Badge variant="default" className="gap-1">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Ativo
+                        </Badge>
+                      ) : (
+                        <Badge variant="destructive" className="gap-1">
+                          <XCircle className="h-3 w-3" />
+                          Inativo
+                        </Badge>
+                      )}
+                      <Badge variant="outline">{tenant.plan}</Badge>
+                    </div>
+                    <CardDescription className="flex items-center gap-4">
+                      <span>Slug: {tenant.slug}</span>
+                      <span>•</span>
+                      <span>
+                        Criado {formatDistanceToNow(new Date(tenant.createdAt), {
+                          addSuffix: true,
+                          locale: ptBR,
+                        })}
+                      </span>
+                    </CardDescription>
                   </div>
-                  <CardDescription className="flex items-center gap-4">
-                    <span>Slug: {tenant.slug}</span>
-                    <span>•</span>
-                    <span>
-                      Criado {formatDistanceToNow(new Date(tenant.createdAt), {
-                        addSuffix: true,
-                        locale: ptBR,
-                      })}
-                    </span>
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Usuários</p>
-                  <p className="text-2xl font-bold">{tenant._count.tenantUsers}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Máximo: {tenant.maxUsers}
-                  </p>
-                </div>
 
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Queries</p>
-                  <p className="text-2xl font-bold">{tenant._count.searchQueries}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Máximo: {tenant.maxSearchQueries}
-                  </p>
+                  {/* Action Buttons */}
+                  <div className="flex gap-2">
+                    <ManageFeaturesForm tenantId={tenant.id} tenantName={tenant.name} />
+                    <EditTenantForm
+                      tenant={{
+                        id: tenant.id,
+                        name: tenant.name,
+                        slug: tenant.slug,
+                        plan: tenant.plan,
+                        maxUsers: tenant.maxUsers,
+                        maxSearchQueries: tenant.maxSearchQueries,
+                        billingEmail: tenant.billingEmail,
+                        isActive: tenant.isActive,
+                      }}
+                    />
+                  </div>
                 </div>
-
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Leads</p>
-                  <p className="text-2xl font-bold">{tenant._count.leads}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Total capturados
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Contrato</p>
-                  <p className="text-sm">
-                    {new Date(tenant.contractStart).toLocaleDateString('pt-BR')}
-                  </p>
-                  {tenant.contractEnd && (
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Usuários</p>
+                    <p className="text-2xl font-bold">{tenant._count.tenantUsers}</p>
                     <p className="text-xs text-muted-foreground">
-                      Até {new Date(tenant.contractEnd).toLocaleDateString('pt-BR')}
+                      Máximo: {tenant.maxUsers}
                     </p>
-                  )}
-                </div>
-              </div>
+                  </div>
 
-              {tenant.billingEmail && (
-                <div className="mt-4 pt-4 border-t">
-                  <p className="text-sm text-muted-foreground">
-                    Email de cobrança: <span className="text-foreground">{tenant.billingEmail}</span>
-                  </p>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Queries</p>
+                    <p className="text-2xl font-bold">{tenant._count.searchQueries}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Máximo: {tenant.maxSearchQueries}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Leads</p>
+                    <p className="text-2xl font-bold">{tenant._count.leads}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Total capturados
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Contrato</p>
+                    <p className="text-sm">
+                      {new Date(tenant.contractStart).toLocaleDateString('pt-BR')}
+                    </p>
+                    {tenant.contractEnd && (
+                      <p className="text-xs text-muted-foreground">
+                        Até {new Date(tenant.contractEnd).toLocaleDateString('pt-BR')}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Features</p>
+                    <p className="text-sm font-bold">{features.length}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {features.filter(f => f !== 'dashboard').slice(0, 2).join(', ') || 'Básico'}
+                    </p>
+                  </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+
+                {tenant.billingEmail && (
+                  <div className="mt-4 pt-4 border-t">
+                    <p className="text-sm text-muted-foreground">
+                      Email de cobrança: <span className="text-foreground">{tenant.billingEmail}</span>
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
     </div>
   )

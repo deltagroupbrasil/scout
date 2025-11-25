@@ -136,6 +136,18 @@ export async function requireSuperAdmin(): Promise<void> {
 }
 
 /**
+ * Features disponíveis no sistema
+ */
+export type TenantFeature =
+  | 'dashboard'       // Acesso ao dashboard básico (sempre habilitado)
+  | 'kanban'          // Kanban de leads
+  | 'search'          // Busca de vagas
+  | 'export'          // Exportação CSV
+  | 'ai_insights'     // Insights de IA
+  | 'contact_enrichment' // Enriquecimento de contatos
+  | 'user_management' // Gestão de usuários do tenant
+
+/**
  * Hierarquia de permissões:
  * ADMIN > MANAGER > USER > VIEWER
  */

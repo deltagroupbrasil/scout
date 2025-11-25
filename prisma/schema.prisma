@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -23,6 +23,10 @@ model Tenant {
   plan            String   @default("basic")  // basic, pro, enterprise (placeholder para futuro)
   maxUsers        Int      @default(5)
   maxSearchQueries Int     @default(3)
+
+  // Features habilitadas (JSON array de strings)
+  // Possíveis: "dashboard", "kanban", "search", "export", "ai_insights", "contact_enrichment"
+  enabledFeatures Json     @default("[\"dashboard\"]")
 
   // Billing
   billingEmail    String?
